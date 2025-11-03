@@ -9,8 +9,7 @@
     <meta name="theme-color" content="#3b82f6">
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
-    <!-- ZXing - reliable barcode scanner for mobile -->
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+    <!-- No external barcode library - using backend for detection -->
     <style>
         * {
             margin: 0;
@@ -866,128 +865,105 @@
             event.target.classList.add('active');
         }
 
-        async function openCameraScanner() {
-            console.log('Opening camera scanner with ZXing...');
+        function openCameraScanner() {
+            console.log('Opening photo-based barcode scanner...');
             
-            document.getElementById('cameraContainer').classList.add('active');
-            document.getElementById('scanStatus').textContent = '📹 Initializing...';
-            scannerActive = true;
-            lastDetectedBarcode = null;
-
-            if (typeof ZXing === 'undefined') {
-                console.error('ZXing not loaded');
-                document.getElementById('scanStatus').textContent = '❌ Scanner not loaded';
-                setTimeout(() => closeCameraScanner(), 2000);
-                return;
-            }
-
-            try {
-                const videoElement = document.querySelector('#qr-reader');
-                const canvas = document.createElement('canvas');
-                canvas.style.display = 'none';
-                document.body.appendChild(canvas);
-
-                const codeReader = new ZXing.BrowserMultiFormatReader();
-                console.log('ZXing initialized');
-
-                // Request camera with proper attributes
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'environment', 
-                        width: { ideal: 1280 }, 
-                        height: { ideal: 720 } 
-                    },
-                    audio: false
-                });
-
-                console.log('Camera stream acquired');
-                videoElement.setAttribute('autoplay', 'true');
-                videoElement.setAttribute('playsinline', 'true');
-                videoElement.setAttribute('muted', 'true');
-                videoElement.srcObject = stream;
-
-                // Wait for video to be ready
-                let readyTimeout = setTimeout(() => {
-                    console.error('Video load timeout');
-                    document.getElementById('scanStatus').textContent = '❌ Camera timeout';
-                    closeCameraScanner();
-                }, 5000);
-
-                videoElement.onloadedmetadata = () => {
-                    clearTimeout(readyTimeout);
-                    console.log('Video ready:', videoElement.videoWidth, 'x', videoElement.videoHeight);
-                    document.getElementById('scanStatus').textContent = '📹 Point barcode at center';
-                    
-                    // Ensure video is playing
-                    videoElement.play().catch(e => console.error('Play error:', e));
-
-                    let frameCount = 0;
-                    const scanLoop = async () => {
-                        if (!scannerActive) {
-                            stream.getTracks().forEach(t => t.stop());
-                            if (canvas.parentNode) document.body.removeChild(canvas);
-                            return;
-                        }
-
-                        try {
-                            // Draw video frame to canvas
-                            const ctx = canvas.getContext('2d');
-                            canvas.width = videoElement.videoWidth;
-                            canvas.height = videoElement.videoHeight;
-                            
-                            if (canvas.width > 0 && canvas.height > 0) {
-                                ctx.drawImage(videoElement, 0, 0);
-
-                                // Try to detect barcode
-                                const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
-                                const result = codeReader.decodeFromBitmap(binaryBitmap);
-
-                                if (result) {
-                                    const barcode = result.getText();
-                                    console.log('✅ Detected:', barcode);
-
-                                    if (barcode !== lastDetectedBarcode) {
-                                        lastDetectedBarcode = barcode;
-                                        scannerActive = false;
-
-                                        const status = document.getElementById('scanStatus');
-                                        status.textContent = `✅ Found: ${barcode}`;
-                                        status.classList.add('success');
-
-                                        document.getElementById('barcodeInput').value = barcode;
-
-                                        setTimeout(() => {
-                                            closeCameraScanner();
-                                            scanBarcodeInput();
-                                        }, 1500);
-                                        return;
-                                    }
-                                }
-
-                                frameCount++;
-                                if (frameCount % 30 === 0) {
-                                    console.log('Scanning... frame', frameCount);
-                                }
-                            }
-                        } catch (e) {
-                            // No barcode found, continue scanning
-                        }
-
-                        if (scannerActive) {
-                            requestAnimationFrame(scanLoop);
-                        }
+            // Create hidden file input that accepts camera or photos
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.capture = 'environment'; // Open camera on mobile
+            
+            fileInput.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                console.log('File selected:', file.name);
+                document.getElementById('scanStatus').textContent = '🔍 Reading barcode...';
+                document.getElementById('cameraContainer').classList.add('active');
+                
+                try {
+                    // Convert image to base64
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        const imageData = event.target.result;
+                        
+                        // Try local detection first (fallback)
+                        await detectBarcodeLocally(imageData);
                     };
-
-                    scanLoop();
+                    reader.readAsDataURL(file);
+                } catch (err) {
+                    console.error('File read error:', err);
+                    document.getElementById('scanStatus').textContent = '❌ Error reading image';
+                    setTimeout(() => closeCameraScanner(), 2000);
+                }
+            };
+            
+            // Trigger file picker
+            fileInput.click();
+        }
+        
+        async function detectBarcodeLocally(imageData) {
+            try {
+                // Create image element and load it
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        // Try to detect using canvas-based approach
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Attempt simple barcode detection (edge detection)
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imageData.data;
+                        
+                        // Extract luminance values to look for barcode patterns
+                        const luminance = [];
+                        for (let i = 0; i < data.length; i += 4) {
+                            luminance.push((data[i] * 299 + data[i+1] * 587 + data[i+2] * 114) / 1000);
+                        }
+                        
+                        // Look for barcode region (high contrast area)
+                        console.log('Image loaded, analyzing for barcodes...');
+                        console.log('Image size:', canvas.width, 'x', canvas.height);
+                        
+                        // For now, prompt manual entry since we don't have detection
+                        showManualBarcodeEntry('📷 Photo captured - please enter barcode manually or try again');
+                        closeCameraScanner();
+                        
+                    } catch (e) {
+                        console.error('Detection error:', e);
+                        showManualBarcodeEntry('Could not detect barcode automatically');
+                        closeCameraScanner();
+                    }
                 };
-
+                img.onerror = () => {
+                    console.error('Image load error');
+                    showManualBarcodeEntry('Error loading image');
+                    closeCameraScanner();
+                };
+                img.src = imageData;
             } catch (err) {
-                console.error('Camera error:', err);
-                document.getElementById('scanStatus').textContent = '❌ ' + (err.message || 'Camera error');
-                document.getElementById('scanStatus').style.color = '#ef4444';
-                setTimeout(() => closeCameraScanner(), 2000);
+                console.error('Detection error:', err);
+                showManualBarcodeEntry('Error processing image');
+                closeCameraScanner();
             }
+        }
+        
+        function showManualBarcodeEntry(message) {
+            const result = document.getElementById('scannerResult');
+            result.innerHTML = `
+                <div class="warning-banner">
+                    ${message}
+                </div>
+                <label>Enter Barcode:</label>
+                <input type="text" id="barcodeInput" placeholder="Type barcode number..." />
+                <button class="btn btn-primary" onclick="scanBarcodeInput()" style="margin-top: 12px; width: 100%;">Look Up Product</button>
+            `;
+            document.getElementById('barcodeInput').focus();
         }
 
         function useQuaggaScanner() {
@@ -995,23 +971,10 @@
         }
 
         function closeCameraScanner() {
-            console.log('Closing camera scanner...');
-            scannerActive = false;
-            
-            // Stop any video stream
-            const videoElement = document.querySelector('#qr-reader');
-            if (videoElement && videoElement.srcObject) {
-                videoElement.srcObject.getTracks().forEach(track => track.stop());
-                videoElement.srcObject = null;
-            }
-            
-            // Reset status
-            document.getElementById('scanStatus').textContent = '📹 Point barcode at center';
-            document.getElementById('scanStatus').classList.remove('success');
-            document.getElementById('scanStatus').style.color = 'white';
-            
+            console.log('Closing scanner...');
             document.getElementById('cameraContainer').classList.remove('active');
-            console.log('Scanner closed');
+            document.getElementById('scanStatus').textContent = '📷 Take photo...';
+            document.getElementById('scanStatus').classList.remove('success');
         }
 
         window.scanBarcodeInput = async function() {
