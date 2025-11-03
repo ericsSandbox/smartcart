@@ -9,8 +9,8 @@
     <meta name="theme-color" content="#3b82f6">
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
-    <!-- JSQuagga - proven barcode scanner -->
-    <script src="https://unpkg.com/@ericblade/quagga2@1.2.6/dist/quagga.min.js"></script>
+    <!-- ZXing - reliable barcode scanner for mobile -->
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -865,172 +865,111 @@
         }
 
         async function openCameraScanner() {
-            console.log('Opening camera scanner...');
+            console.log('Opening camera scanner with ZXing...');
             
-            // Show camera container
             document.getElementById('cameraContainer').classList.add('active');
             document.getElementById('scanStatus').textContent = '📹 Initializing...';
             scannerActive = true;
             lastDetectedBarcode = null;
 
-            // Try Quagga if available
-            if (typeof Quagga !== 'undefined') {
-                console.log('Using Quagga scanner');
-                useQuaggaScanner();
-            } else {
-                console.log('Quagga not available, trying manual camera');
-                document.getElementById('scanStatus').innerHTML = `
-                    <div style="text-align: center;">
-                        ❌ Scanner not loaded<br>
-                        <small>Type barcode manually below</small>
-                    </div>
-                `;
-                setTimeout(() => {
-                    document.getElementById('cameraContainer').classList.remove('active');
-                }, 2000);
+            if (typeof ZXing === 'undefined') {
+                console.error('ZXing not loaded');
+                document.getElementById('scanStatus').textContent = '❌ Scanner not loaded';
+                setTimeout(() => closeCameraScanner(), 2000);
+                return;
+            }
+
+            try {
+                const videoElement = document.querySelector('#qr-reader');
+                const canvas = document.createElement('canvas');
+                canvas.style.display = 'none';
+                document.body.appendChild(canvas);
+
+                const codeReader = new ZXing.BrowserMultiFormatReader();
+                console.log('ZXing initialized');
+
+                // Request camera
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+
+                videoElement.srcObject = stream;
+                videoElement.onloadedmetadata = () => {
+                    console.log('Video loaded, starting scan loop');
+                    document.getElementById('scanStatus').textContent = '📹 Point barcode at center';
+                    
+                    const scanLoop = async () => {
+                        if (!scannerActive) {
+                            stream.getTracks().forEach(t => t.stop());
+                            document.body.removeChild(canvas);
+                            return;
+                        }
+
+                        try {
+                            // Draw video frame to canvas
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = videoElement.videoWidth;
+                            canvas.height = videoElement.videoHeight;
+                            ctx.drawImage(videoElement, 0, 0);
+
+                            // Try to detect barcode
+                            const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                            const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+                            const result = codeReader.decodeFromBitmap(binaryBitmap);
+
+                            if (result) {
+                                const barcode = result.getText();
+                                console.log('✅ Detected:', barcode);
+
+                                if (barcode !== lastDetectedBarcode) {
+                                    lastDetectedBarcode = barcode;
+                                    scannerActive = false;
+
+                                    const status = document.getElementById('scanStatus');
+                                    status.textContent = `✅ Found: ${barcode}`;
+                                    status.classList.add('success');
+
+                                    document.getElementById('barcodeInput').value = barcode;
+
+                                    setTimeout(() => {
+                                        closeCameraScanner();
+                                        scanBarcodeInput();
+                                    }, 1500);
+                                }
+                            }
+                        } catch (e) {
+                            // No barcode found, continue scanning
+                        }
+
+                        if (scannerActive) {
+                            requestAnimationFrame(scanLoop);
+                        }
+                    };
+
+                    scanLoop();
+                };
+
+            } catch (err) {
+                console.error('Camera error:', err);
+                document.getElementById('scanStatus').textContent = '❌ ' + (err.message || 'Camera error');
+                setTimeout(() => closeCameraScanner(), 2000);
             }
         }
 
         function useQuaggaScanner() {
-            try {
-                console.log('Initializing Quagga with high-resolution settings');
-                
-                // Clear any previous Quagga state
-                try {
-                    Quagga.stop();
-                    Quagga.offDetected();
-                    Quagga.offProcessed();
-                } catch (e) {}
-
-                const readerElement = document.querySelector('#qr-reader');
-                // Clear any existing video elements
-                readerElement.innerHTML = '';
-                
-                Quagga.init(
-                    {
-                        inputStream: {
-                            name: 'Live',
-                            type: 'LiveStream',
-                            target: readerElement,
-                            constraints: {
-                                facingMode: 'environment',
-                                width: { ideal: 1280, min: 640 },
-                                height: { ideal: 720, min: 480 },
-                                aspectRatio: { ideal: 16/9 }
-                            }
-                        },
-                        locator: {
-                            halfSample: true
-                        },
-                        numOfWorkers: 4,
-                        frequency: 10,
-                        decoder: {
-                            readers: [
-                                { format: 'ean_reader', config: {} },
-                                { format: 'ean_8_reader', config: {} },
-                                { format: 'upc_reader', config: {} },
-                                { format: 'upc_e_reader', config: {} },
-                                { format: 'code_128_reader', config: {} },
-                                { format: 'code_39_reader', config: {} },
-                                { format: 'codabar_reader', config: {} }
-                            ],
-                            debug: {
-                                showCanvas: false,
-                                showPatterns: false,
-                                showFrequency: false,
-                                showIds: false
-                            }
-                        }
-                    },
-                    (err) => {
-                        if (err) {
-                            console.error('Quagga init error:', err);
-                            document.getElementById('scanStatus').textContent = '❌ Camera init failed: ' + err.message;
-                            document.getElementById('scanStatus').style.color = '#ef4444';
-                            setTimeout(() => {
-                                closeCameraScanner();
-                            }, 3000);
-                            return;
-                        }
-
-                        console.log('Quagga initialized successfully, starting scanner...');
-                        document.getElementById('scanStatus').textContent = '📹 Point barcode at center';
-                        document.getElementById('scanStatus').style.color = 'white';
-                        
-                        try {
-                            Quagga.start();
-                            console.log('Quagga started, camera ready');
-                        } catch (startErr) {
-                            console.error('Quagga start error:', startErr);
-                            document.getElementById('scanStatus').textContent = '❌ Start failed';
-                            document.getElementById('scanStatus').style.color = '#ef4444';
-                            return;
-                        }
-
-                        let detectionCount = 0;
-                        Quagga.onDetected((result) => {
-                            if (!scannerActive) {
-                                return;
-                            }
-                            if (!result || !result.codeResult || !result.codeResult.code) {
-                                return;
-                            }
-
-                            const barcode = result.codeResult.code;
-                            const confidence = result.codeResult.confidence || 0;
-                            
-                            detectionCount++;
-                            console.log(`[${detectionCount}] Detected: ${barcode} (confidence: ${confidence.toFixed(2)})`);
-
-                            if (barcode === lastDetectedBarcode) {
-                                console.log('Duplicate, skipping');
-                                return;
-                            }
-                            
-                            // Accept any detection with reasonable confidence
-                            if (confidence < 0.3) {
-                                console.log('Low confidence (' + confidence.toFixed(2) + '), skipping');
-                                return;
-                            }
-                            
-                            lastDetectedBarcode = barcode;
-                            scannerActive = false;
-                            
-                            const status = document.getElementById('scanStatus');
-                            status.textContent = `✅ Found: ${barcode}`;
-                            status.classList.add('success');
-
-                            document.getElementById('barcodeInput').value = barcode;
-
-                            setTimeout(() => {
-                                closeCameraScanner();
-                                scanBarcodeInput();
-                            }, 1500);
-                        });
-                    }
-                );
-            } catch (err) {
-                console.error('Quagga setup error:', err);
-                document.getElementById('scanStatus').textContent = '❌ Setup error: ' + err.message;
-                document.getElementById('scanStatus').style.color = '#ef4444';
-                setTimeout(() => {
-                    closeCameraScanner();
-                }, 3000);
-            }
+            // Removed - using ZXing instead
         }
 
         function closeCameraScanner() {
             console.log('Closing camera scanner...');
             scannerActive = false;
             
-            try {
-                if (typeof Quagga !== 'undefined') {
-                    Quagga.stop();
-                    Quagga.offDetected();
-                    console.log('Quagga stopped');
-                }
-            } catch (err) {
-                console.log('Quagga cleanup error (expected):', err.message);
+            // Stop any video stream
+            const videoElement = document.querySelector('#qr-reader');
+            if (videoElement && videoElement.srcObject) {
+                videoElement.srcObject.getTracks().forEach(track => track.stop());
+                videoElement.srcObject = null;
             }
             
             // Reset status
