@@ -9,8 +9,8 @@
     <meta name="theme-color" content="#3b82f6">
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
-    <!-- Updated: html5-qrcode library - better for 1D barcodes -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+    <!-- ZXing library - better for iOS and 1D barcodes -->
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -664,7 +664,7 @@
 
             <div id="cameraContainer">
                 <div id="scanStatus">📹 Point barcode at center</div>
-                <div id="qr-reader"></div>
+                <video id="qr-reader" style="width: 100%; height: 100%; object-fit: cover; flex: 1;"></video>
                 <div class="scanner-hint">Center barcode in frame</div>
                 <div id="cameraControls">
                     <button type="button" class="close" onclick="closeCameraScanner()">✕ Close</button>
@@ -705,8 +705,9 @@
         let pantryItems = [];
         let shoppingLists = [];
         let members = [];
-        let html5QrcodeScanner = null;
+        let codeReader = null;
         let scannerActive = false;
+        let videoStream = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
@@ -823,39 +824,103 @@
             document.getElementById('cameraContainer').classList.add('active');
             document.getElementById('scanStatus').textContent = '📹 Initializing scanner...';
 
-            if (!html5QrcodeScanner) {
-                html5QrcodeScanner = new Html5Qrcode('qr-reader');
-            }
-
             try {
-                await html5QrcodeScanner.start(
-                    { facingMode: 'environment' },
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                    (decodedText) => {
-                        handleBarcodeDetected(decodedText);
-                    },
-                    (errorMessage) => {
-                        // Suppress error messages during normal scanning
-                    }
-                );
-                scannerActive = true;
+                // Request camera access
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                
+                videoStream = stream;
+                const videoElement = document.getElementById('qr-reader');
+                videoElement.srcObject = stream;
+                
+                console.log('Camera stream started');
                 document.getElementById('scanStatus').textContent = '📹 Point barcode at center';
-                console.log('Scanner started successfully');
+
+                // Initialize ZXing decoder
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.EAN_13,
+                    ZXing.BarcodeFormat.EAN_8,
+                    ZXing.BarcodeFormat.UPC_A,
+                    ZXing.BarcodeFormat.UPC_E,
+                    ZXing.BarcodeFormat.CODE_128,
+                    ZXing.BarcodeFormat.CODE_39,
+                    ZXing.BarcodeFormat.CODABAR,
+                    ZXing.BarcodeFormat.QR_CODE
+                ]);
+
+                codeReader = new ZXing.BrowserMultiFormatReader(hints);
+                scannerActive = true;
+
+                // Start continuous scanning
+                startScanning();
+
             } catch (err) {
                 console.error('Camera error:', err);
-                document.getElementById('scanStatus').textContent = '❌ Camera error: ' + err.message;
+                let errorMsg = err.message;
+                if (err.name === 'NotAllowedError') {
+                    errorMsg = 'Camera permission denied. Please allow camera access in your browser settings.';
+                } else if (err.name === 'NotFoundError') {
+                    errorMsg = 'No camera found on this device.';
+                }
+                document.getElementById('scanStatus').textContent = '❌ ' + errorMsg;
                 document.getElementById('scanStatus').style.color = '#ef4444';
             }
         }
 
-        function closeCameraScanner() {
-            if (html5QrcodeScanner && scannerActive) {
-                html5QrcodeScanner.stop().then(() => {
-                    console.log('Scanner stopped');
-                    scannerActive = false;
-                    document.getElementById('cameraContainer').classList.remove('active');
-                }).catch(err => console.error('Error stopping scanner:', err));
+        function startScanning() {
+            if (!scannerActive || !codeReader) return;
+
+            const videoElement = document.getElementById('qr-reader');
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            function scan() {
+                if (!scannerActive) return;
+
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+
+                if (canvas.width === 0 || canvas.height === 0) {
+                    requestAnimationFrame(scan);
+                    return;
+                }
+
+                ctx.drawImage(videoElement, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+
+                try {
+                    const result = codeReader.decodeFromBitmap(binaryBitmap);
+                    if (result) {
+                        handleBarcodeDetected(result.getText());
+                        return;
+                    }
+                } catch (err) {
+                    // No barcode found, keep scanning
+                }
+
+                requestAnimationFrame(scan);
             }
+
+            scan();
+        }
+
+        function closeCameraScanner() {
+            scannerActive = false;
+            
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            
+            const videoElement = document.getElementById('qr-reader');
+            videoElement.srcObject = null;
+            
+            document.getElementById('cameraContainer').classList.remove('active');
+            console.log('Scanner closed');
         }
 
         function handleBarcodeDetected(barcode) {
