@@ -852,7 +852,7 @@
 
         function useQuaggaScanner() {
             try {
-                console.log('Initializing Quagga with #qr-reader target');
+                console.log('Initializing Quagga with high-resolution settings');
                 
                 Quagga.init(
                     {
@@ -862,19 +862,25 @@
                             target: document.querySelector('#qr-reader'),
                             constraints: {
                                 facingMode: 'environment',
-                                width: { min: 640 },
-                                height: { min: 480 }
+                                width: { ideal: 1280, min: 640 },
+                                height: { ideal: 720, min: 480 },
+                                aspectRatio: { ideal: 16/9 }
                             }
                         },
+                        locator: {
+                            halfSample: true
+                        },
+                        numOfWorkers: 2,
+                        frequency: 10,
                         decoder: {
                             readers: [
-                                'ean_reader',
-                                'ean_8_reader',
-                                'upc_reader',
-                                'upc_e_reader',
-                                'code_128_reader',
-                                'code_39_reader',
-                                'codabar_reader'
+                                { format: 'ean_reader', config: {} },
+                                { format: 'ean_8_reader', config: {} },
+                                { format: 'upc_reader', config: {} },
+                                { format: 'upc_e_reader', config: {} },
+                                { format: 'code_128_reader', config: {} },
+                                { format: 'code_39_reader', config: {} },
+                                { format: 'codabar_reader', config: {} }
                             ],
                             debug: {
                                 showCanvas: false,
@@ -907,21 +913,28 @@
                             return;
                         }
 
+                        let detectionCount = 0;
                         Quagga.onDetected((result) => {
                             if (!scannerActive) {
-                                console.log('Scanner not active, ignoring detection');
                                 return;
                             }
                             if (!result.codeResult || !result.codeResult.code) {
-                                console.log('No code in result');
                                 return;
                             }
 
                             const barcode = result.codeResult.code;
-                            console.log('✅ Barcode detected:', barcode);
+                            const confidence = result.codeResult.confidence || 0;
+                            
+                            detectionCount++;
+                            console.log(`[${detectionCount}] Detected: ${barcode} (confidence: ${confidence.toFixed(2)})`);
 
                             if (barcode === lastDetectedBarcode) {
-                                console.log('Duplicate barcode, ignoring');
+                                return;
+                            }
+                            
+                            // Require reasonable confidence
+                            if (confidence < 0.5) {
+                                console.log('Low confidence, ignoring');
                                 return;
                             }
                             
