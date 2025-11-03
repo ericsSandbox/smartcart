@@ -664,7 +664,7 @@
 
             <div id="cameraContainer">
                 <div id="scanStatus">📹 Point barcode at center</div>
-                <video id="qr-reader" style="width: 100%; height: 100%; object-fit: cover; flex: 1;"></video>
+                <video id="qr-reader" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; flex: 1; display: block; -webkit-transform: scaleX(-1); transform: scaleX(-1);"></video>
                 <div class="scanner-hint">Center barcode in frame</div>
                 <div id="cameraControls">
                     <button type="button" class="close" onclick="closeCameraScanner()">✕ Close</button>
@@ -827,14 +827,28 @@
             try {
                 // Request camera access
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
                 });
                 
                 videoStream = stream;
                 const videoElement = document.getElementById('qr-reader');
                 videoElement.srcObject = stream;
                 
-                console.log('Camera stream started');
+                // Wait for video to be ready
+                await new Promise((resolve) => {
+                    videoElement.onloadedmetadata = () => {
+                        videoElement.play();
+                        console.log('Video stream started - dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+                        resolve();
+                    };
+                    setTimeout(resolve, 1000); // fallback timeout
+                });
+                
                 document.getElementById('scanStatus').textContent = '📹 Point barcode at center';
 
                 // Initialize ZXing decoder
