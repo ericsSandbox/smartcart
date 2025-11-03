@@ -9,8 +9,8 @@
     <meta name="theme-color" content="#3b82f6">
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
-    <!-- Barcode scanning - QuaggaJS v0.12.1 proven to work with 1D barcodes -->
-    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+    <!-- Updated: html5-qrcode library - better for 1D barcodes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -91,7 +91,6 @@
             display: block;
         }
 
-        /* Pantry Styles */
         .stats {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
@@ -455,7 +454,6 @@
             line-height: 1.6;
         }
 
-        /* Barcode Scanner Styles */
         #cameraContainer {
             position: fixed;
             inset: 0;
@@ -469,91 +467,10 @@
             display: flex;
         }
 
-        #videoPreview {
+        #qr-reader {
             flex: 1;
             width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1);
-        }
-
-        /* Targeting Reticle */
-        #reticleOverlay {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-
-        .reticle {
-            position: absolute;
-            width: 200px;
-            height: 200px;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            border: 3px solid #00ff00;
-            border-radius: 20px;
-            box-shadow: 
-                0 0 0 1000px rgba(0, 0, 0, 0.5),
-                inset 0 0 10px #00ff00;
-        }
-
-        .reticle::before,
-        .reticle::after {
-            content: '';
-            position: absolute;
-            background: #00ff00;
-        }
-
-        .reticle::before {
-            top: -20px;
-            left: 50%;
-            width: 2px;
-            height: 20px;
-            transform: translateX(-50%);
-        }
-
-        .reticle::after {
-            bottom: -20px;
-            left: 50%;
-            width: 2px;
-            height: 20px;
-            transform: translateX(-50%);
-        }
-
-        .reticle .corner {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #00ff00;
-        }
-
-        .reticle .corner.tl {
-            top: -12px;
-            left: -12px;
-            border-right: none;
-            border-bottom: none;
-        }
-
-        .reticle .corner.tr {
-            top: -12px;
-            right: -12px;
-            border-left: none;
-            border-bottom: none;
-        }
-
-        .reticle .corner.bl {
-            bottom: -12px;
-            left: -12px;
-            border-right: none;
-            border-top: none;
-        }
-
-        .reticle .corner.br {
-            bottom: -12px;
-            right: -12px;
-            border-left: none;
-            border-top: none;
+            background: black;
         }
 
         #scanStatus {
@@ -567,6 +484,7 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
             z-index: 10;
             padding: 10px;
+            font-size: 16px;
         }
 
         #scanStatus.success {
@@ -620,6 +538,7 @@
             font-size: 14px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
             animation: bounce 1s infinite;
+            z-index: 5;
         }
 
         @keyframes bounce {
@@ -641,7 +560,6 @@
     </header>
 
     <div class="container">
-        <!-- PANTRY TAB -->
         <div class="tab-content active" id="pantry">
             <div class="stats">
                 <div class="stat-card">
@@ -667,12 +585,11 @@
             <div class="section-title">Pantry Items</div>
             <div class="item-list" id="itemList"></div>
             <div class="empty-state" id="emptyState">
-                <div class="icon">📭</div>
+                <div class="icon">🧭</div>
                 <p>Your pantry is empty</p>
             </div>
         </div>
 
-        <!-- SHOPPING LIST TAB -->
         <div class="tab-content" id="shopping">
             <div class="search-box">
                 <input type="search" id="shoppingSearch" placeholder="🔍 Search lists..." />
@@ -686,7 +603,6 @@
             </div>
         </div>
 
-        <!-- MEMBERS TAB -->
         <div class="tab-content" id="members">
             <div class="section-title">Household Members</div>
             <div id="membersList"></div>
@@ -699,7 +615,6 @@
 
     <button class="add-item-btn" id="addItemBtn" title="Add Item">+</button>
 
-    <!-- ADD PANTRY ITEM MODAL -->
     <div class="modal" id="addModal">
         <div class="modal-content">
             <div class="modal-header">Add Item to Pantry</div>
@@ -709,7 +624,6 @@
                 <button class="tab-toggle" data-form="barcode">📱 Scan</button>
             </div>
 
-            <!-- MANUAL ENTRY FORM -->
             <form id="addForm" class="form-section active" data-form="manual">
                 <label>Item Name *</label>
                 <input type="text" id="itemName" placeholder="e.g., Milk, Bread" required>
@@ -736,42 +650,29 @@
                 </div>
             </form>
 
-            <!-- BARCODE SCANNER FORM -->
             <div class="form-section" data-form="barcode" id="barcodeForm">
-                <label>📱 Scan or Type Barcode:</label>
-                <div style="display: flex; gap: 8px;">
-                    <input type="text" id="barcodeInput" placeholder="Barcode number..." style="flex: 1;">
-                    <button type="button" class="btn btn-primary" onclick="openCameraScanner()" style="flex: 0 0 auto;">�</button>
+                <label>📱 Scan Barcode:</label>
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <input type="text" id="barcodeInput" placeholder="Or type barcode..." style="flex: 1;">
+                    <button type="button" class="btn btn-primary" onclick="openCameraScanner()" style="flex: 0 0 auto;">📷</button>
                 </div>
-                <small style="color: #6b7280; display: block; margin-top: 8px;">Tap 📷 to use camera, or type manually</small>
                 <div id="scannerResult" style="margin-top: 16px;"></div>
                 <div class="button-group" style="margin-top: 20px;">
                     <button type="button" class="btn btn-secondary" id="cancelBarcodeBtn">Cancel</button>
                 </div>
             </div>
 
-            <!-- CAMERA SCANNER OVERLAY -->
             <div id="cameraContainer">
-                <div id="scanStatus">📹 Point barcode at center target</div>
-                <!-- html5-qrcode will inject video here -->
-                <div id="videoPreview" style="width: 100%; height: 100%; flex: 1;"></div>
-                <canvas id="reticleOverlay" style="position: absolute; inset: 0;"></canvas>
-                <div class="scanner-hint">Center barcode in green box</div>
-                <div class="reticle">
-                    <div class="corner tl"></div>
-                    <div class="corner tr"></div>
-                    <div class="corner bl"></div>
-                    <div class="corner br"></div>
-                </div>
+                <div id="scanStatus">📹 Point barcode at center</div>
+                <div id="qr-reader"></div>
+                <div class="scanner-hint">Center barcode in frame</div>
                 <div id="cameraControls">
-                    <button type="button" onclick="toggleFlashlight()" id="flashBtn">🔦 Flash</button>
                     <button type="button" class="close" onclick="closeCameraScanner()">✕ Close</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ADD MEMBER MODAL -->
     <div class="modal" id="addMemberModal">
         <div class="modal-content">
             <div class="modal-header">Add Member</div>
@@ -797,7 +698,6 @@
     </div>
 
     <script>
-        // DATA STORAGE
         const PANTRY_KEY = 'smartcart_pantry';
         const SHOPPING_KEY = 'smartcart_shopping';
         const MEMBERS_KEY = 'smartcart_members';
@@ -805,8 +705,9 @@
         let pantryItems = [];
         let shoppingLists = [];
         let members = [];
+        let html5QrcodeScanner = null;
+        let scannerActive = false;
 
-        // INIT
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
             setupEventListeners();
@@ -826,7 +727,6 @@
         }
 
         function setupEventListeners() {
-            // Tab navigation
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const tab = e.target.dataset.tab;
@@ -834,24 +734,27 @@
                 });
             });
 
-            // Form tabs
-            // NOTE: Form tabs removed - barcode scanner now opens by default
+            document.querySelectorAll('.tab-toggle').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const form = e.target.dataset.form;
+                    switchFormTab(form);
+                });
+            });
 
-            // Add item button
             document.getElementById('addItemBtn').addEventListener('click', () => {
                 const activeTab = document.querySelector('.tab-content.active').id;
                 if (activeTab === 'pantry') {
                     document.getElementById('addModal').classList.add('active');
-                    // Open barcode scanner by default
-                    setTimeout(() => {
-                        openCameraScanner();
-                    }, 300);
                 } else if (activeTab === 'members') {
                     document.getElementById('addMemberModal').classList.add('active');
                 }
             });
 
-            // Modals
+            document.getElementById('cancelBtn').addEventListener('click', () => {
+                document.getElementById('addModal').classList.remove('active');
+                document.getElementById('addForm').reset();
+            });
+
             document.getElementById('cancelBarcodeBtn').addEventListener('click', () => {
                 closeCameraScanner();
                 document.getElementById('addModal').classList.remove('active');
@@ -864,12 +767,16 @@
                 document.getElementById('addMemberForm').reset();
             });
 
+            document.getElementById('addForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                addManualItem();
+            });
+
             document.getElementById('addMemberForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 addMember();
             });
 
-            // Barcode input - lookup on Enter
             document.getElementById('barcodeInput').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -877,19 +784,19 @@
                 }
             });
 
-            // Barcode input - lookup on Enter
-            document.getElementById('barcodeInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    scanBarcodeInput();
-                }
+            document.getElementById('searchInput').addEventListener('input', () => {
+                renderPantry();
             });
 
-            // Close modals on background click
+            document.getElementById('shoppingSearch').addEventListener('input', () => {
+                renderShopping();
+            });
+
             document.querySelectorAll('.modal').forEach(modal => {
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) {
                         modal.classList.remove('active');
+                        closeCameraScanner();
                     }
                 });
             });
@@ -903,227 +810,66 @@
             event.target.classList.add('active');
         }
 
-        let barcodeDetectionActive = false;
-        let barcodeStream = null;
-        let cameraIsActive = false;
-        let flashlightOn = false;
-        let detectionInterval = null;
-        let detectionFrameCount = 0;
-        let lastDetectionLog = 0;
-        let lastDetectedBarcode = null;
-        let detectionConfidenceCount = 0;
-        const CONFIDENCE_THRESHOLD = 1; // Accept on first detection
+        function switchFormTab(form) {
+            document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
+            document.querySelectorAll('.tab-toggle').forEach(t => t.classList.remove('active'));
+            
+            document.querySelector(`.form-section[data-form="${form}"]`).classList.add('active');
+            event.target.classList.add('active');
+        }
 
-        // Open camera scanner
         async function openCameraScanner() {
-            console.log('[CAMERA] Opening camera scanner...');
-            const container = document.getElementById('cameraContainer');
-            container.classList.add('active');
-
-            // Reset detection state
-            lastDetectedBarcode = null;
-            detectionConfidenceCount = 0;
-
+            console.log('Opening camera scanner...');
+            document.getElementById('cameraContainer').classList.add('active');
             document.getElementById('scanStatus').textContent = '📹 Initializing scanner...';
 
-            console.log('[CAMERA] Starting barcode detection');
-            cameraIsActive = true;
-            startBarcodeDetection();
-        }
-
-        // Close camera scanner
-        function closeCameraScanner() {
-            console.log('[CAMERA] Closing camera');
-            cameraIsActive = false;
-            document.getElementById('cameraContainer').classList.remove('active');
-
-            // Reset detection state
-            lastDetectedBarcode = null;
-            detectionConfidenceCount = 0;
-
-            // Stop Quagga if running
-            if (typeof Quagga !== 'undefined') {
-                try {
-                    Quagga.stop();
-                    Quagga.offDetected();
-                    console.log('[BARCODE] Quagga stopped and cleaned up');
-                } catch (e) {
-                    console.error('[BARCODE] Error stopping Quagga:', e);
-                }
+            if (!html5QrcodeScanner) {
+                html5QrcodeScanner = new Html5Qrcode('qr-reader');
             }
-
-            // Turn off flashlight if on
-            if (flashlightOn) {
-                toggleFlashlight();
-            }
-        }
-
-        // Toggle flashlight
-        async function toggleFlashlight() {
-            if (!barcodeStream) return;
 
             try {
-                const track = barcodeStream.getVideoTracks()[0];
-                const capabilities = track.getCapabilities();
-
-                if (!capabilities.torch) {
-                    alert('Flashlight not available on this device');
-                    return;
-                }
-
-                flashlightOn = !flashlightOn;
-                await track.applyConstraints({
-                    advanced: [{ torch: flashlightOn }]
-                });
-
-                const btn = document.getElementById('flashBtn');
-                btn.textContent = flashlightOn ? '🔆 Flash On' : '🔦 Flash Off';
-                btn.style.background = flashlightOn ? '#f59e0b' : '#3b82f6';
-            } catch (err) {
-                console.error('Flashlight error:', err);
-            }
-        }
-
-        // Start barcode detection with html5-qrcode (supports QR + 1D barcodes)
-        async function startBarcodeDetection() {
-            if (!cameraIsActive) return;
-
-            console.log('[BARCODE] Starting html5-qrcode detection...');
-            document.getElementById('scanStatus').textContent = '📹 Point barcode at target';
-
-            // Wait for library to load
-            let attempts = 0;
-            while (typeof Quagga === 'undefined' && attempts < 30) {
-                console.warn('[BARCODE] Library loading... (attempt ' + (attempts+1) + ')');
-                await new Promise(r => setTimeout(r, 100));
-                attempts++;
-            }
-
-            if (typeof Quagga === 'undefined') {
-                console.error('[BARCODE] ❌ Library failed to load');
-                document.getElementById('scanStatus').textContent = '❌ Scanner library failed to load';
-                document.getElementById('scanStatus').style.color = '#ef4444';
-                return;
-            }
-
-            console.log('[BARCODE] ✅ Library loaded, initializing QuaggaJS...');
-
-            try {
-                Quagga.init(
-                    {
-                        inputStream: {
-                            name: "Live",
-                            type: "LiveStream",
-                            target: document.querySelector('#videoPreview'),
-                            constraints: {
-                                width: { min: 640 },
-                                height: { min: 480 },
-                                facingMode: "environment"
-                            }
-                        },
-                        decoder: {
-                            readers: [
-                                "ean_reader",
-                                "ean_8_reader",
-                                "upc_reader",
-                                "upc_e_reader",
-                                "code_128_reader",
-                                "code_39_reader",
-                                "codabar_reader",
-                                "i2of5_reader"
-                            ],
-                            debug: {
-                                showCanvas: false,
-                                showPatterns: false,
-                                showFrequency: false,
-                                showIds: false
-                            }
-                        }
+                await html5QrcodeScanner.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    (decodedText) => {
+                        handleBarcodeDetected(decodedText);
                     },
-                    (err) => {
-                        if (err) {
-                            console.error('[BARCODE] ❌ Init error:', err);
-                            document.getElementById('scanStatus').textContent = '❌ Error: ' + err.message;
-                            return;
-                        }
-
-                        console.log('[BARCODE] ✅ QuaggaJS initialized, starting scanner...');
-                        
-                        try {
-                            Quagga.start();
-                            console.log('[BARCODE] ✅ Scanner started');
-                            document.getElementById('scanStatus').textContent = '📹 Point barcode at target';
-
-                            // Reset detection state
-                            lastDetectedBarcode = null;
-                            detectionConfidenceCount = 0;
-
-                            // Barcode detection handler
-                            Quagga.onDetected((result) => {
-                                if (!cameraIsActive) return;
-                                if (!result.codeResult) return;
-
-                                const barcode = result.codeResult.code;
-                                const confidence = result.codeResult.confidence;
-
-                                console.log('[BARCODE] 🎯 DETECTED:', barcode, 'confidence:', confidence);
-
-                                // Filter out very short codes
-                                if (barcode.length < 5) {
-                                    console.log('[BARCODE] Too short, ignoring');
-                                    return;
-                                }
-
-                                // Confidence filtering
-                                if (lastDetectedBarcode === barcode) {
-                                    detectionConfidenceCount++;
-                                    console.log('[BARCODE] Confidence:', detectionConfidenceCount, '/', CONFIDENCE_THRESHOLD);
-
-                                    if (detectionConfidenceCount >= CONFIDENCE_THRESHOLD) {
-                                        console.log('[BARCODE] ✅ ACCEPTED:', barcode);
-                                        cameraIsActive = false;
-                                        handleBarcodeDetected(barcode);
-                                    }
-                                } else {
-                                    lastDetectedBarcode = barcode;
-                                    detectionConfidenceCount = 1;
-                                    console.log('[BARCODE] New code detected:', barcode);
-                                }
-                            });
-
-                            console.log('[BARCODE] ✅ Scanner active and listening for barcodes');
-                        } catch (startErr) {
-                            console.error('[BARCODE] Error starting scanner:', startErr);
-                            document.getElementById('scanStatus').textContent = '❌ Error: ' + startErr.message;
-                        }
+                    (errorMessage) => {
+                        // Suppress error messages during normal scanning
                     }
                 );
-
+                scannerActive = true;
+                document.getElementById('scanStatus').textContent = '📹 Point barcode at center';
+                console.log('Scanner started successfully');
             } catch (err) {
-                console.error('[BARCODE] Setup error:', err);
-                document.getElementById('scanStatus').textContent = '❌ Error: ' + err.message;
+                console.error('Camera error:', err);
+                document.getElementById('scanStatus').textContent = '❌ Camera error: ' + err.message;
+                document.getElementById('scanStatus').style.color = '#ef4444';
             }
         }
 
-        // Handle detected barcode
+        function closeCameraScanner() {
+            if (html5QrcodeScanner && scannerActive) {
+                html5QrcodeScanner.stop().then(() => {
+                    console.log('Scanner stopped');
+                    scannerActive = false;
+                    document.getElementById('cameraContainer').classList.remove('active');
+                }).catch(err => console.error('Error stopping scanner:', err));
+            }
+        }
+
         function handleBarcodeDetected(barcode) {
-            if (!barcode || barcode.length === 0 || !cameraIsActive) return;
+            if (!scannerActive) return;
 
-            console.log('[BARCODE] ✅✅✅ BARCODE DETECTED:', barcode);
+            console.log('Barcode detected:', barcode);
 
-            // Update status with green highlight
+            scannerActive = false;
             const status = document.getElementById('scanStatus');
             status.textContent = `✅ Found: ${barcode}`;
             status.classList.add('success');
 
-            // Stop camera immediately
-            cameraIsActive = false;
-            console.log('[BARCODE] Detection successful, stopping camera');
-
-            // Set barcode in input
             document.getElementById('barcodeInput').value = barcode;
 
-            // Close camera and trigger lookup
             setTimeout(() => {
                 closeCameraScanner();
                 scanBarcodeInput();
@@ -1132,9 +878,8 @@
 
         window.scanBarcodeInput = async function() {
             const barcode = document.getElementById('barcodeInput').value.trim();
-
             if (!barcode) return;
-            
+
             const result = document.getElementById('scannerResult');
             result.innerHTML = '<div class="loading"><div class="spinner"></div> Looking up...</div>';
 
@@ -1191,6 +936,7 @@
                     `;
                 }
             } catch (err) {
+                console.error('Lookup error:', err);
                 result.innerHTML = `
                     <div class="warning-banner danger">
                         ⚠️ Error looking up barcode
@@ -1238,23 +984,7 @@
             document.getElementById('barcodeInput').value = '';
         };
 
-        function addMember() {
-            const member = {
-                id: Date.now(),
-                name: document.getElementById('memberName').value,
-                age: document.getElementById('memberAge').value || null,
-                allergies: document.getElementById('memberAllergies').value || null,
-                dietary_pref: document.getElementById('memberDiet').value || null
-            };
-            members.push(member);
-            saveData();
-            renderUI();
-            document.getElementById('addMemberForm').reset();
-            document.getElementById('addMemberModal').classList.remove('active');
-        }
-
-        // Add manual entry from the fallback section
-        window.addManualItem = function() {
+        function addManualItem() {
             const name = document.getElementById('itemName').value;
             if (!name) {
                 alert('Please enter an item name');
@@ -1270,14 +1000,24 @@
             pantryItems.push(item);
             saveData();
             renderUI();
-            closeCameraScanner();
             document.getElementById('addModal').classList.remove('active');
-            // Reset form
-            document.getElementById('itemName').value = '';
-            document.getElementById('itemQty').value = '1';
-            document.getElementById('itemUnit').value = 'unit';
-            document.getElementById('itemExpires').value = '';
-        };
+            document.getElementById('addForm').reset();
+        }
+
+        function addMember() {
+            const member = {
+                id: Date.now(),
+                name: document.getElementById('memberName').value,
+                age: document.getElementById('memberAge').value || null,
+                allergies: document.getElementById('memberAllergies').value || null,
+                dietary_pref: document.getElementById('memberDiet').value || null
+            };
+            members.push(member);
+            saveData();
+            renderUI();
+            document.getElementById('addMemberForm').reset();
+            document.getElementById('addMemberModal').classList.remove('active');
+        }
 
         function deletePantryItem(id) {
             if (confirm('Delete this item?')) {
@@ -1322,7 +1062,7 @@
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             
             if (diffDays < 0) return '🔴 Expired';
-            if (diffDays === 0) return '🟠 Expires today';
+            if (diffDays === 0) return '🟡 Expires today';
             if (diffDays === 1) return '🟡 Expires tomorrow';
             if (diffDays <= 7) return `🟡 ${diffDays}d`;
             return null;
