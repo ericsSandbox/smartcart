@@ -9,8 +9,8 @@
     <meta name="theme-color" content="#3b82f6">
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
-    <!-- Dynamsoft Barcode Reader: Proven for retail barcodes on iOS -->
-    <script async src="https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js"></script>
+    <!-- Instascan: Simple, reliable barcode scanner for iOS -->
+    <script src="https://cdn.jsdelivr.net/npm/instascan@1.8.0/build/instascan.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -760,7 +760,7 @@
             loadData();
             setupEventListeners();
             renderUI();
-            initDynamsoft(); // Initialize barcode scanner
+            initScanner(); // Initialize barcode scanner
         });
 
         function loadData() {
@@ -870,82 +870,59 @@
         let scanner = null;
         let cameraStream = null;
 
-        async function initDynamsoft() {
-            try {
-                // Initialize Dynamsoft Barcode Reader
-                await Dynamsoft.DBR.BarcodeScanner.setLicense("DLS2eyJvcmdhbml6YXRpb25JZCI6IjIwMDAwMSJ9");
-                console.log('✅ Dynamsoft initialized');
-            } catch (err) {
-                console.error('Dynamsoft init error:', err);
-            }
+        let scanner = null;
+
+        async function initScanner() {
+            console.log('Scanner library loaded');
         }
 
         async function openCameraScanner() {
-            console.log('🎬 Opening barcode scanner with Dynamsoft...');
+            console.log('Opening barcode scanner...');
             document.getElementById('cameraContainer').classList.add('active');
-            document.getElementById('scanStatus').textContent = '⏳ Initializing scanner...';
+            document.getElementById('scanStatus').textContent = '📹 Starting camera...';
             scannerActive = true;
             lastDetectedBarcode = null;
 
             try {
                 const videoElement = document.getElementById('qr-reader');
-                
-                // Create scanner instance
-                scanner = await Dynamsoft.DBR.BarcodeScanner.createInstance();
-                console.log('✅ Scanner instance created');
-
-                // Configure for retail barcodes
-                await scanner.updateRuntimeSettings({
-                    mMinBarcodeTextLength: 6,
-                    mMaxBarcodeTextLength: 13,
-                    barcodeFormatIds: [
-                        Dynamsoft.DBR.EnumBarcodeFormat.BF_CODE_128,
-                        Dynamsoft.DBR.EnumBarcodeFormat.BF_UPC_A,
-                        Dynamsoft.DBR.EnumBarcodeFormat.BF_UPC_E,
-                        Dynamsoft.DBR.EnumBarcodeFormat.BF_EAN_13,
-                        Dynamsoft.DBR.EnumBarcodeFormat.BF_EAN_8,
-                        Dynamsoft.DBR.EnumBarcodeFormat.BF_QR_CODE
-                    ]
+                scanner = new Instascan.Scanner({
+                    video: videoElement,
+                    mirror: false
                 });
 
-                // Set video element
-                scanner.setUIElement(videoElement);
-                
-                // Show camera and start scanning
-                document.getElementById('scanStatus').textContent = '📹 Point barcode at center...';
-                
-                // Handle detected barcodes
-                scanner.onPlayed = () => {
-                    console.log('📹 Camera started');
-                };
+                scanner.addListener('scan', function(content) {
+                    if (content && content !== lastDetectedBarcode) {
+                        lastDetectedBarcode = content;
+                        console.log('Barcode detected:', content);
+                        scannerActive = false;
+                        
+                        document.getElementById('scanStatus').textContent = 'Found: ' + content;
+                        document.getElementById('scanStatus').classList.add('success');
+                        document.getElementById('barcodeInput').value = content;
 
-                scanner.onFrameRead = results => {
-                    if (results.length > 0) {
-                        const barcode = results[0].barcodeText;
-                        if (barcode && barcode !== lastDetectedBarcode) {
-                            lastDetectedBarcode = barcode;
-                            console.log('🎉 DETECTED:', barcode);
-                            
-                            scannerActive = false;
-                            
-                            const status = document.getElementById('scanStatus');
-                            status.textContent = `✅ Found: ${barcode}`;
-                            status.classList.add('success');
-
-                            document.getElementById('barcodeInput').value = barcode;
-
-                            // Close scanner and lookup
-                            setTimeout(() => {
-                                closeCameraScanner();
-                                scanBarcodeInput();
-                            }, 1000);
-                        }
+                        setTimeout(() => {
+                            closeCameraScanner();
+                            scanBarcodeInput();
+                        }, 800);
                     }
-                };
+                });
 
-                // Start scanning
-                await scanner.show();
-                console.log('� Scanner visible');
+                Instascan.Camera.request().then(function(camera) {
+                    console.log('Camera granted');
+                    scanner.start(camera);
+                    document.getElementById('scanStatus').textContent = '📹 Center barcode in frame...';
+                }).catch(function(e) {
+                    console.error('Camera error:', e);
+                    document.getElementById('scanStatus').textContent = 'Camera access denied';
+                    setTimeout(() => closeCameraScanner(), 2000);
+                });
+
+            } catch (err) {
+                console.error('Error:', err);
+                document.getElementById('scanStatus').textContent = 'Scanner error';
+                setTimeout(() => closeCameraScanner(), 2000);
+            }
+        }
 
             } catch (err) {
                 console.error('❌ Scanner error:', err);
@@ -956,25 +933,23 @@
         }
 
         function closeCameraScanner() {
-            console.log('🛑 Closing scanner...');
+            console.log('Closing scanner...');
             scannerActive = false;
 
-            // Stop Dynamsoft scanner
+            // Stop Instascan scanner
             if (scanner) {
                 try {
-                    scanner.hide();
-                    scanner.dispose();
+                    scanner.stop();
                     scanner = null;
-                    console.log('✅ Scanner stopped');
+                    console.log('Scanner stopped');
                 } catch (err) {
-                    console.error('Error stopping scanner:', err);
+                    console.error('Error:', err);
                 }
             }
 
             // Reset UI
-            document.getElementById('scanStatus').textContent = '📷 Ready...';
+            document.getElementById('scanStatus').textContent = 'Ready...';
             document.getElementById('scanStatus').classList.remove('success');
-            document.getElementById('scanStatus').style.color = 'white';
             document.getElementById('cameraContainer').classList.remove('active');
         }
 
