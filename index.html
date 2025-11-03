@@ -9,8 +9,8 @@
     <meta name="theme-color" content="#3b82f6">
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
-    <!-- ZXing library - better for iOS and 1D barcodes -->
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+    <!-- JSQuagga - proven barcode scanner -->
+    <script src="https://serratus.github.io/quaggaJS/js/quagga.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -471,6 +471,11 @@
             flex: 1;
             width: 100%;
             background: black;
+            display: none;
+        }
+
+        #qr-reader.active {
+            display: block;
         }
 
         #scanStatus {
@@ -664,7 +669,7 @@
 
             <div id="cameraContainer">
                 <div id="scanStatus">📹 Point barcode at center</div>
-                <video id="qr-reader" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; flex: 1; display: block; -webkit-transform: scaleX(-1); transform: scaleX(-1);"></video>
+                <div id="qr-reader" class="active"></div>
                 <div class="scanner-hint">Center barcode in frame</div>
                 <div id="cameraControls">
                     <button type="button" class="close" onclick="closeCameraScanner()">✕ Close</button>
@@ -705,9 +710,8 @@
         let pantryItems = [];
         let shoppingLists = [];
         let members = [];
-        let codeReader = null;
         let scannerActive = false;
-        let videoStream = null;
+        let lastDetectedBarcode = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
@@ -821,153 +825,140 @@
 
         async function openCameraScanner() {
             console.log('Opening camera scanner...');
+            
+            // Try to access camera directly
             document.getElementById('cameraContainer').classList.add('active');
-            document.getElementById('scanStatus').textContent = '📹 Initializing scanner...';
+            document.getElementById('scanStatus').textContent = '📹 Initializing...';
+            scannerActive = true;
+            lastDetectedBarcode = null;
 
             try {
-                // Request camera access
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
                     audio: false
                 });
                 
-                videoStream = stream;
-                const videoElement = document.getElementById('qr-reader');
+                const videoElement = document.createElement('video');
                 videoElement.srcObject = stream;
-                
-                // Wait for video to be ready
-                await new Promise((resolve) => {
-                    videoElement.onloadedmetadata = () => {
-                        videoElement.play();
-                        console.log('Video stream started - dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
-                        resolve();
-                    };
-                    setTimeout(resolve, 1000); // fallback timeout
-                });
+                videoElement.autoplay = true;
+                videoElement.playsinline = true;
+                videoElement.style.display = 'none';
+                document.body.appendChild(videoElement);
                 
                 document.getElementById('scanStatus').textContent = '📹 Point barcode at center';
-
-                // Initialize ZXing decoder
-                const hints = new Map();
-                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                    ZXing.BarcodeFormat.EAN_13,
-                    ZXing.BarcodeFormat.EAN_8,
-                    ZXing.BarcodeFormat.UPC_A,
-                    ZXing.BarcodeFormat.UPC_E,
-                    ZXing.BarcodeFormat.CODE_128,
-                    ZXing.BarcodeFormat.CODE_39,
-                    ZXing.BarcodeFormat.CODABAR,
-                    ZXing.BarcodeFormat.QR_CODE
-                ]);
-
-                codeReader = new ZXing.BrowserMultiFormatReader(hints);
-                scannerActive = true;
-
-                // Start continuous scanning
-                startScanning();
-
+                
+                // Try Quagga if available
+                if (typeof Quagga !== 'undefined') {
+                    console.log('Using Quagga scanner');
+                    useQuaggaScanner();
+                } else {
+                    console.log('Quagga not available, using manual mode');
+                    document.getElementById('scanStatus').innerHTML = `
+                        <div style="text-align: center;">
+                            📹 Camera is active<br>
+                            <small>Type barcode manually below or use phone camera</small>
+                        </div>
+                    `;
+                    
+                    // Stop stream if we can't use Quagga
+                    stream.getTracks().forEach(track => track.stop());
+                    document.body.removeChild(videoElement);
+                    document.getElementById('cameraContainer').classList.remove('active');
+                }
+                
             } catch (err) {
                 console.error('Camera error:', err);
-                let errorMsg = err.message;
+                let errorMsg = err.message || 'Unknown error';
                 if (err.name === 'NotAllowedError') {
-                    errorMsg = 'Camera permission denied. Please allow camera access in your browser settings.';
+                    errorMsg = 'Camera permission denied';
                 } else if (err.name === 'NotFoundError') {
-                    errorMsg = 'No camera found on this device.';
+                    errorMsg = 'No camera found';
                 }
                 document.getElementById('scanStatus').textContent = '❌ ' + errorMsg;
                 document.getElementById('scanStatus').style.color = '#ef4444';
             }
         }
 
-        function startScanning() {
-            if (!scannerActive || !codeReader) return;
+        function useQuaggaScanner() {
+            try {
+                Quagga.init(
+                    {
+                        inputStream: {
+                            name: 'Live',
+                            type: 'LiveStream',
+                            target: document.querySelector('#qr-reader'),
+                            constraints: {
+                                facingMode: 'environment',
+                                width: { min: 640 },
+                                height: { min: 480 }
+                            }
+                        },
+                        decoder: {
+                            readers: [
+                                'ean_reader',
+                                'ean_8_reader',
+                                'upc_reader',
+                                'upc_e_reader',
+                                'code_128_reader',
+                                'code_39_reader',
+                                'codabar_reader'
+                            ],
+                            debug: {
+                                showCanvas: false,
+                                showPatterns: false,
+                                showFrequency: false,
+                                showIds: false
+                            }
+                        }
+                    },
+                    (err) => {
+                        if (err) {
+                            console.error('Quagga init error:', err);
+                            return;
+                        }
 
-            const videoElement = document.getElementById('qr-reader');
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            let frameCount = 0;
-            let lastLogTime = Date.now();
+                        console.log('Quagga started');
+                        Quagga.start();
 
-            function scan() {
-                if (!scannerActive) return;
+                        Quagga.onDetected((result) => {
+                            if (!scannerActive) return;
+                            if (!result.codeResult || !result.codeResult.code) return;
 
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
+                            const barcode = result.codeResult.code;
+                            console.log('✅ Barcode detected:', barcode);
 
-                if (canvas.width === 0 || canvas.height === 0) {
-                    requestAnimationFrame(scan);
-                    return;
-                }
+                            if (barcode === lastDetectedBarcode) return;
+                            lastDetectedBarcode = barcode;
 
-                ctx.drawImage(videoElement, 0, 0);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+                            scannerActive = false;
+                            const status = document.getElementById('scanStatus');
+                            status.textContent = `✅ Found: ${barcode}`;
+                            status.classList.add('success');
 
-                frameCount++;
-                const now = Date.now();
-                if (now - lastLogTime > 3000) {
-                    console.log('[BARCODE] Processed', frameCount, 'frames, canvas:', canvas.width + 'x' + canvas.height);
-                    frameCount = 0;
-                    lastLogTime = now;
-                }
+                            document.getElementById('barcodeInput').value = barcode;
 
-                try {
-                    const result = codeReader.decodeFromBitmap(binaryBitmap);
-                    if (result) {
-                        console.log('[BARCODE] ✅ DETECTED:', result.getText());
-                        handleBarcodeDetected(result.getText());
-                        return;
+                            setTimeout(() => {
+                                closeCameraScanner();
+                                scanBarcodeInput();
+                            }, 1500);
+                        });
                     }
-                } catch (err) {
-                    // No barcode found, keep scanning
-                    // Uncomment for debugging:
-                    // console.log('[BARCODE] No detection:', err.message);
-                }
-
-                // Process every other frame to reduce CPU load
-                setTimeout(() => requestAnimationFrame(scan), 100);
+                );
+            } catch (err) {
+                console.error('Quagga setup error:', err);
             }
-
-            console.log('[BARCODE] Starting scan loop, camera ready');
-            scan();
         }
 
         function closeCameraScanner() {
             scannerActive = false;
-            
-            if (videoStream) {
-                videoStream.getTracks().forEach(track => track.stop());
-                videoStream = null;
+            try {
+                Quagga.stop();
+                Quagga.offDetected();
+            } catch (err) {
+                console.log('Quagga cleanup:', err);
             }
-            
-            const videoElement = document.getElementById('qr-reader');
-            videoElement.srcObject = null;
-            
             document.getElementById('cameraContainer').classList.remove('active');
             console.log('Scanner closed');
-        }
-
-        function handleBarcodeDetected(barcode) {
-            if (!scannerActive) return;
-
-            console.log('Barcode detected:', barcode);
-
-            scannerActive = false;
-            const status = document.getElementById('scanStatus');
-            status.textContent = `✅ Found: ${barcode}`;
-            status.classList.add('success');
-
-            document.getElementById('barcodeInput').value = barcode;
-
-            setTimeout(() => {
-                closeCameraScanner();
-                scanBarcodeInput();
-            }, 1500);
         }
 
         window.scanBarcodeInput = async function() {
