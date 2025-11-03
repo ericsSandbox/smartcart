@@ -889,6 +889,8 @@
             const videoElement = document.getElementById('qr-reader');
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
+            let frameCount = 0;
+            let lastLogTime = Date.now();
 
             function scan() {
                 if (!scannerActive) return;
@@ -906,19 +908,32 @@
                 const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
 
+                frameCount++;
+                const now = Date.now();
+                if (now - lastLogTime > 3000) {
+                    console.log('[BARCODE] Processed', frameCount, 'frames, canvas:', canvas.width + 'x' + canvas.height);
+                    frameCount = 0;
+                    lastLogTime = now;
+                }
+
                 try {
                     const result = codeReader.decodeFromBitmap(binaryBitmap);
                     if (result) {
+                        console.log('[BARCODE] ✅ DETECTED:', result.getText());
                         handleBarcodeDetected(result.getText());
                         return;
                     }
                 } catch (err) {
                     // No barcode found, keep scanning
+                    // Uncomment for debugging:
+                    // console.log('[BARCODE] No detection:', err.message);
                 }
 
-                requestAnimationFrame(scan);
+                // Process every other frame to reduce CPU load
+                setTimeout(() => requestAnimationFrame(scan), 100);
             }
 
+            console.log('[BARCODE] Starting scan loop, camera ready');
             scan();
         }
 
