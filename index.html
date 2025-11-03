@@ -546,6 +546,46 @@
             z-index: 5;
         }
 
+        #scannerReticle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 100px;
+            border: 3px solid #00ff00;
+            border-radius: 8px;
+            z-index: 8;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 0, 0.5),
+                inset 0 0 20px rgba(0, 255, 0, 0.2);
+            pointer-events: none;
+        }
+
+        #scannerReticle::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 10px;
+            background: #00ff00;
+            border-radius: 0 0 4px 4px;
+        }
+
+        #scannerReticle::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 10px;
+            background: #00ff00;
+            border-radius: 4px 4px 0 0;
+        }
+
         @keyframes bounce {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-10px); }
@@ -670,6 +710,7 @@
             <div id="cameraContainer">
                 <div id="scanStatus">📹 Point barcode at center</div>
                 <div id="qr-reader" class="active"></div>
+                <div id="scannerReticle"></div>
                 <div class="scanner-hint">Center barcode in frame</div>
                 <div id="cameraControls">
                     <button type="button" class="close" onclick="closeCameraScanner()">✕ Close</button>
@@ -854,12 +895,23 @@
             try {
                 console.log('Initializing Quagga with high-resolution settings');
                 
+                // Clear any previous Quagga state
+                try {
+                    Quagga.stop();
+                    Quagga.offDetected();
+                    Quagga.offProcessed();
+                } catch (e) {}
+
+                const readerElement = document.querySelector('#qr-reader');
+                // Clear any existing video elements
+                readerElement.innerHTML = '';
+                
                 Quagga.init(
                     {
                         inputStream: {
                             name: 'Live',
                             type: 'LiveStream',
-                            target: document.querySelector('#qr-reader'),
+                            target: readerElement,
                             constraints: {
                                 facingMode: 'environment',
                                 width: { ideal: 1280, min: 640 },
@@ -870,7 +922,7 @@
                         locator: {
                             halfSample: true
                         },
-                        numOfWorkers: 2,
+                        numOfWorkers: 4,
                         frequency: 10,
                         decoder: {
                             readers: [
@@ -893,11 +945,11 @@
                     (err) => {
                         if (err) {
                             console.error('Quagga init error:', err);
-                            document.getElementById('scanStatus').textContent = '❌ Camera init failed';
+                            document.getElementById('scanStatus').textContent = '❌ Camera init failed: ' + err.message;
                             document.getElementById('scanStatus').style.color = '#ef4444';
                             setTimeout(() => {
                                 closeCameraScanner();
-                            }, 2000);
+                            }, 3000);
                             return;
                         }
 
@@ -907,9 +959,11 @@
                         
                         try {
                             Quagga.start();
-                            console.log('Quagga started, waiting for detections...');
+                            console.log('Quagga started, camera ready');
                         } catch (startErr) {
                             console.error('Quagga start error:', startErr);
+                            document.getElementById('scanStatus').textContent = '❌ Start failed';
+                            document.getElementById('scanStatus').style.color = '#ef4444';
                             return;
                         }
 
@@ -918,7 +972,7 @@
                             if (!scannerActive) {
                                 return;
                             }
-                            if (!result.codeResult || !result.codeResult.code) {
+                            if (!result || !result.codeResult || !result.codeResult.code) {
                                 return;
                             }
 
@@ -929,12 +983,13 @@
                             console.log(`[${detectionCount}] Detected: ${barcode} (confidence: ${confidence.toFixed(2)})`);
 
                             if (barcode === lastDetectedBarcode) {
+                                console.log('Duplicate, skipping');
                                 return;
                             }
                             
-                            // Require reasonable confidence
-                            if (confidence < 0.5) {
-                                console.log('Low confidence, ignoring');
+                            // Accept any detection with reasonable confidence
+                            if (confidence < 0.3) {
+                                console.log('Low confidence (' + confidence.toFixed(2) + '), skipping');
                                 return;
                             }
                             
@@ -956,11 +1011,11 @@
                 );
             } catch (err) {
                 console.error('Quagga setup error:', err);
-                document.getElementById('scanStatus').textContent = '❌ Setup error';
+                document.getElementById('scanStatus').textContent = '❌ Setup error: ' + err.message;
                 document.getElementById('scanStatus').style.color = '#ef4444';
                 setTimeout(() => {
                     closeCameraScanner();
-                }, 2000);
+                }, 3000);
             }
         }
 
