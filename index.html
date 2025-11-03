@@ -9,10 +9,8 @@
     <meta name="theme-color" content="#3b82f6">
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
-    <!-- jsQR: Proven barcode/QR detection library for iOS -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-    <!-- Quagga2: Barcode detection (as fallback) -->
-    <script async src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@3.4.2/dist/quagga.min.js"></script>
+    <!-- Dynamsoft Barcode Reader: Proven for retail barcodes on iOS -->
+    <script async src="https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.42/dist/dbr.js"></script>
     <style>
         * {
             margin: 0;
@@ -762,6 +760,7 @@
             loadData();
             setupEventListeners();
             renderUI();
+            initDynamsoft(); // Initialize barcode scanner
         });
 
         function loadData() {
@@ -868,179 +867,108 @@
             event.target.classList.add('active');
         }
 
+        let scanner = null;
         let cameraStream = null;
-        let scanningInterval = null;
 
-        function openCameraScanner() {
-            console.log('🎬 Opening live barcode scanner...');
+        async function initDynamsoft() {
+            try {
+                // Initialize Dynamsoft Barcode Reader
+                await Dynamsoft.DBR.BarcodeScanner.setLicense("DLS2eyJvcmdhbml6YXRpb25JZCI6IjIwMDAwMSJ9");
+                console.log('✅ Dynamsoft initialized');
+            } catch (err) {
+                console.error('Dynamsoft init error:', err);
+            }
+        }
+
+        async function openCameraScanner() {
+            console.log('🎬 Opening barcode scanner with Dynamsoft...');
             document.getElementById('cameraContainer').classList.add('active');
-            document.getElementById('scanStatus').textContent = '📹 Requesting camera permission...';
+            document.getElementById('scanStatus').textContent = '⏳ Initializing scanner...';
             scannerActive = true;
             lastDetectedBarcode = null;
 
-            const videoElement = document.getElementById('qr-reader');
-            const canvas = document.createElement('canvas');
-            const canvasContext = canvas.getContext('2d');
+            try {
+                const videoElement = document.getElementById('qr-reader');
+                
+                // Create scanner instance
+                scanner = await Dynamsoft.DBR.BarcodeScanner.createInstance();
+                console.log('✅ Scanner instance created');
 
-            // Request camera with proper constraints
-            navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                },
-                audio: false
-            }).then(stream => {
-                console.log('✅ Camera permission granted');
-                cameraStream = stream;
-                videoElement.srcObject = stream;
+                // Configure for retail barcodes
+                await scanner.updateRuntimeSettings({
+                    mMinBarcodeTextLength: 6,
+                    mMaxBarcodeTextLength: 13,
+                    barcodeFormatIds: [
+                        Dynamsoft.DBR.EnumBarcodeFormat.BF_CODE_128,
+                        Dynamsoft.DBR.EnumBarcodeFormat.BF_UPC_A,
+                        Dynamsoft.DBR.EnumBarcodeFormat.BF_UPC_E,
+                        Dynamsoft.DBR.EnumBarcodeFormat.BF_EAN_13,
+                        Dynamsoft.DBR.EnumBarcodeFormat.BF_EAN_8,
+                        Dynamsoft.DBR.EnumBarcodeFormat.BF_QR_CODE
+                    ]
+                });
+
+                // Set video element
+                scanner.setUIElement(videoElement);
                 
-                // Ensure video plays
-                videoElement.setAttribute('playsinline', '');
-                videoElement.setAttribute('autoplay', '');
-                videoElement.setAttribute('muted', '');
-                
+                // Show camera and start scanning
                 document.getElementById('scanStatus').textContent = '📹 Point barcode at center...';
-
-                // Wait for video metadata to load
-                videoElement.onloadedmetadata = () => {
-                    console.log('📹 Video ready:', videoElement.videoWidth, 'x', videoElement.videoHeight);
-                    startBarcodeScanning(videoElement, canvas, canvasContext);
+                
+                // Handle detected barcodes
+                scanner.onPlayed = () => {
+                    console.log('📹 Camera started');
                 };
 
-                // Fallback timeout
-                setTimeout(() => {
-                    if (!scanningInterval) {
-                        console.warn('Video load timeout, trying fallback...');
-                        startBarcodeScanning(videoElement, canvas, canvasContext);
-                    }
-                }, 2000);
+                scanner.onFrameRead = results => {
+                    if (results.length > 0) {
+                        const barcode = results[0].barcodeText;
+                        if (barcode && barcode !== lastDetectedBarcode) {
+                            lastDetectedBarcode = barcode;
+                            console.log('🎉 DETECTED:', barcode);
+                            
+                            scannerActive = false;
+                            
+                            const status = document.getElementById('scanStatus');
+                            status.textContent = `✅ Found: ${barcode}`;
+                            status.classList.add('success');
 
-            }).catch(err => {
-                console.error('❌ Camera error:', err);
-                document.getElementById('scanStatus').textContent = '❌ Camera permission denied';
+                            document.getElementById('barcodeInput').value = barcode;
+
+                            // Close scanner and lookup
+                            setTimeout(() => {
+                                closeCameraScanner();
+                                scanBarcodeInput();
+                            }, 1000);
+                        }
+                    }
+                };
+
+                // Start scanning
+                await scanner.show();
+                console.log('� Scanner visible');
+
+            } catch (err) {
+                console.error('❌ Scanner error:', err);
+                document.getElementById('scanStatus').textContent = '❌ ' + (err.message || 'Scanner error');
                 document.getElementById('scanStatus').style.color = '#ef4444';
                 setTimeout(() => closeCameraScanner(), 2000);
-            });
+            }
         }
-
-        function startBarcodeScanning(videoElement, canvas, canvasContext) {
-            console.log('🔍 Starting barcode detection loop...');
-            let frameCount = 0;
-            let detectionFailCount = 0;
-
-            scanningInterval = setInterval(() => {
-                if (!scannerActive) {
-                    clearInterval(scanningInterval);
-                    scanningInterval = null;
-                    return;
-                }
-
-                try {
-                    // Draw current video frame to canvas
-                    canvas.width = videoElement.videoWidth;
-                    canvas.height = videoElement.videoHeight;
-
-                    if (canvas.width === 0 || canvas.height === 0) {
-                        detectionFailCount++;
-                        if (detectionFailCount > 30) {
-                            console.error('Video not loading properly');
-                            document.getElementById('scanStatus').textContent = '❌ Video failed to load';
-                            closeCameraScanner();
-                        }
-                        return;
-                    }
-
-                    canvasContext.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-                    
-                    // Get image data from canvas
-                    const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
-                    
-                    // Try jsQR first (works better for 1D codes on iOS)
-                    let barcode = null;
-                    try {
-                        const qrResult = jsQR(imageData.data, imageData.width, imageData.height, {
-                            inversionAttempts: 'dontInvert'
-                        });
-                        if (qrResult && qrResult.data) {
-                            barcode = qrResult.data;
-                            console.log('✅ jsQR detected:', barcode);
-                        }
-                    } catch (e) {
-                        // jsQR failed, continue
-                    }
-
-                    // Try Quagga2 if jsQR didn't detect anything
-                    if (!barcode && typeof Quagga !== 'undefined') {
-                        try {
-                            // Quagga2 detection attempt
-                            const quaggaResult = Quagga.decodeStream ? true : false;
-                            if (quaggaResult) {
-                                // Would need proper Quagga2 integration
-                            }
-                        } catch (e) {
-                            // Quagga2 failed, continue
-                        }
-                    }
-
-                    // If barcode detected
-                    if (barcode && barcode !== lastDetectedBarcode) {
-                        lastDetectedBarcode = barcode;
-                        console.log('🎉 BARCODE DETECTED:', barcode);
-                        
-                        scannerActive = false;
-                        clearInterval(scanningInterval);
-                        scanningInterval = null;
-
-                        const status = document.getElementById('scanStatus');
-                        status.textContent = `✅ Found: ${barcode}`;
-                        status.classList.add('success');
-
-                        document.getElementById('barcodeInput').value = barcode;
-
-                        setTimeout(() => {
-                            closeCameraScanner();
-                            scanBarcodeInput();
-                        }, 1500);
-                        return;
-                    }
-
-                    frameCount++;
-                    if (frameCount % 30 === 0) {
-                        console.log(`🔄 Scanning... frame ${frameCount}`);
-                    }
-
-                } catch (err) {
-                    console.error('Frame processing error:', err);
-                }
-            }, 100); // Process frame every 100ms (10 FPS)
-        }
-
-        // Barcode detection libraries loaded - jsQR + Quagga2
 
         function closeCameraScanner() {
-            console.log('🛑 Closing camera scanner...');
+            console.log('🛑 Closing scanner...');
             scannerActive = false;
 
-            // Stop scanning interval
-            if (scanningInterval) {
-                clearInterval(scanningInterval);
-                scanningInterval = null;
-            }
-
-            // Stop camera stream
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => {
-                    console.log('Stopping track:', track.kind);
-                    track.stop();
-                });
-                cameraStream = null;
-            }
-
-            // Clear video
-            const videoElement = document.getElementById('qr-reader');
-            if (videoElement) {
-                videoElement.srcObject = null;
+            // Stop Dynamsoft scanner
+            if (scanner) {
+                try {
+                    scanner.hide();
+                    scanner.dispose();
+                    scanner = null;
+                    console.log('✅ Scanner stopped');
+                } catch (err) {
+                    console.error('Error stopping scanner:', err);
+                }
             }
 
             // Reset UI
@@ -1048,8 +976,6 @@
             document.getElementById('scanStatus').classList.remove('success');
             document.getElementById('scanStatus').style.color = 'white';
             document.getElementById('cameraContainer').classList.remove('active');
-            
-            console.log('✅ Scanner closed');
         }
 
         window.scanBarcodeInput = async function() {
