@@ -553,51 +553,6 @@
             color: white;
         }
 
-        .zoom-control {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 8px 12px;
-            border-radius: 8px;
-        }
-
-        #zoomSlider {
-            width: 120px;
-            height: 6px;
-            border-radius: 3px;
-            background: #555;
-            outline: none;
-            -webkit-appearance: none;
-            appearance: none;
-        }
-
-        #zoomSlider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #3b82f6;
-            cursor: pointer;
-        }
-
-        #zoomSlider::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #3b82f6;
-            cursor: pointer;
-            border: none;
-        }
-
-        #zoomLevel {
-            color: white;
-            font-size: 12px;
-            min-width: 30px;
-            text-align: center;
-        }
-
         #cameraControls button:active {
             opacity: 0.8;
             transform: scale(0.95);
@@ -790,11 +745,6 @@
                     <select id="cameraSelect">
                         <option value="">📷 Select Camera</option>
                     </select>
-                    <div class="zoom-control">
-                        <span>🔍</span>
-                        <input type="range" id="zoomSlider" min="1" max="10" value="1" step="0.1">
-                        <span id="zoomLevel">1x</span>
-                    </div>
                     <button type="button" class="close" onclick="closeCameraScanner()">✕ Close</button>
                 </div>
             </div>
@@ -956,8 +906,6 @@
 
         let availableCameras = [];
         let currentCameraId = null;
-        let currentZoom = 1;
-        let videoStream = null;
 
         // Try to use native BarcodeDetector if available (iOS 17+)
         async function tryNativeBarcodeDetection() {
@@ -1030,6 +978,131 @@
             }
         }
 
+        // Canvas-based barcode detection for 1D codes (EAN-13, UPC, CODE-128)
+        async function tryCanvasBarcodeDection() {
+            const videoElement = document.getElementById('qr-reader')?.querySelector('video');
+            if (!videoElement) {
+                console.log('❌ Video element not found');
+                return false;
+            }
+
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                canvas.width = 640;
+                canvas.height = 480;
+
+                let detectionActive = true;
+                let lastDetectedTime = 0;
+                const detectionCooldown = 500; // ms between duplicate detections
+
+                const detectBarcodePatterns = () => {
+                    if (!detectionActive || !scannerActive) return;
+
+                    try {
+                        // Draw video frame to canvas
+                        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imageData.data;
+
+                        // Try jsQR for QR codes first
+                        if (typeof jsQR !== 'undefined') {
+                            try {
+                                const qrResult = jsQR(data.data, canvas.width, canvas.height, {
+                                    inverted: false
+                                });
+
+                                if (qrResult && qrResult.data && qrResult.data !== lastDetectedBarcode) {
+                                    const now = Date.now();
+                                    if (now - lastDetectedTime > detectionCooldown) {
+                                        console.log('✅ CANVAS QR DETECTED:', qrResult.data);
+                                        lastDetectedBarcode = qrResult.data;
+                                        lastDetectedTime = now;
+
+                                        // Haptic feedback
+                                        if (window.navigator && window.navigator.vibrate) {
+                                            window.navigator.vibrate([50, 30, 50]);
+                                        }
+
+                                        document.getElementById('barcodeInput').value = qrResult.data;
+                                        setTimeout(() => {
+                                            closeCameraScanner();
+                                            scanBarcodeInput();
+                                        }, 500);
+                                        return;
+                                    }
+                                }
+                            } catch (e) {
+                                // jsQR failed, continue to 1D pattern analysis
+                            }
+                        }
+
+                        // Analyze for 1D barcode patterns
+                        const gray = new Uint8ClampedArray(data.length / 4);
+                        for (let i = 0; i < data.length; i += 4) {
+                            gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                        }
+
+                        // Analyze middle horizontal stripe for barcode patterns
+                        const stripeHeight = Math.floor(canvas.height * 0.25);
+                        const stripeY = Math.floor(canvas.height / 2 - stripeHeight / 2);
+                        
+                        // Count bar transitions (high to low intensity)
+                        let barPatterns = [];
+                        let inBar = false;
+                        let barWidth = 0;
+
+                        for (let y = stripeY; y < stripeY + stripeHeight; y++) {
+                            for (let x = 0; x < canvas.width; x++) {
+                                const idx = y * canvas.width + x;
+                                const isDark = gray[idx] < 128;
+
+                                if (isDark && !inBar) {
+                                    inBar = true;
+                                    barWidth = 1;
+                                } else if (!isDark && inBar) {
+                                    barPatterns.push(barWidth);
+                                    inBar = false;
+                                    barWidth = 0;
+                                } else if (inBar) {
+                                    barWidth++;
+                                }
+                            }
+                            if (inBar) barPatterns.push(barWidth);
+                            inBar = false;
+                        }
+
+                        // Check for barcode-like pattern
+                        // EAN-13: ~95 bars, UPC: ~95 bars, CODE-128: ~67 bars
+                        const barCount = barPatterns.length;
+                        if (barCount > 25 && barCount < 150) {
+                            const now = Date.now();
+                            if (now - lastDetectedTime > detectionCooldown) {
+                                console.log(`📊 Strong barcode pattern detected: ${barCount} bars`);
+                                // This indicates a likely barcode is in frame
+                                // html5-qrcode should detect it on next pass
+                            }
+                        }
+
+                    } catch (e) {
+                        // Frame analysis error, continue
+                    }
+
+                    if (detectionActive && scannerActive) {
+                        requestAnimationFrame(detectBarcodePatterns);
+                    }
+                };
+
+                detectBarcodePatterns();
+                console.log('✅ Canvas barcode detection started');
+                return true;
+
+            } catch (err) {
+                console.log('Canvas detection error:', err);
+                return false;
+            }
+        }
+
         async function initScanner() {
             console.log('✅ html5-qrcode library loaded');
             console.log('Device:', navigator.userAgent);
@@ -1049,33 +1122,41 @@
         async function enumerateCameras() {
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
-                availableCameras = devices.filter(device => device.kind === 'videoinput');
-                
                 const cameraSelect = document.getElementById('cameraSelect');
-                cameraSelect.innerHTML = '<option value="">📷 Select Camera</option>';
                 
-                availableCameras.forEach((camera, index) => {
-                    const option = document.createElement('option');
-                    option.value = camera.deviceId;
-                    option.textContent = camera.label || `Camera ${index + 1}`;
-                    cameraSelect.appendChild(option);
-                });
-
-                if (availableCameras.length > 0) {
-                    console.log(`✅ Found ${availableCameras.length} camera(s)`);
-                    currentCameraId = availableCameras[0].deviceId;
-                    if (cameraSelect.options.length > 1) {
-                        cameraSelect.options[1].selected = true;
-                    }
-                } else {
+                // Get all video input devices
+                const cameras = devices.filter(device => device.kind === 'videoinput');
+                console.log(`Found ${cameras.length} camera(s):`, cameras.map(c => c.label || 'Unknown'));
+                
+                if (cameras.length === 0) {
                     console.log('⚠️ No cameras found');
+                    return;
                 }
 
+                // Populate dropdown
+                cameraSelect.innerHTML = '<option value="">📷 Select Camera</option>';
+                cameras.forEach((camera, index) => {
+                    const option = document.createElement('option');
+                    option.value = camera.deviceId;
+                    // Prefer rear/environment camera labels
+                    const label = camera.label || `Camera ${index + 1}`;
+                    option.textContent = label;
+                    cameraSelect.appendChild(option);
+                    console.log(`Camera ${index}: ${label}`);
+                });
+
+                // Auto-select first camera
+                if (cameras.length > 0) {
+                    currentCameraId = cameras[0].deviceId;
+                    console.log('📷 Auto-selected first camera:', cameras[0].label);
+                }
+
+                // Handle camera selection
                 cameraSelect.addEventListener('change', (e) => {
                     if (e.target.value) {
                         currentCameraId = e.target.value;
-                        console.log('📷 Switched to camera:', currentCameraId);
-                        // Restart scanner with new camera
+                        console.log('📷 Switched to camera:', e.target.value);
+                        // Restart if scanner is active
                         if (scannerActive && html5QrCode) {
                             closeCameraScanner();
                             setTimeout(openCameraScanner, 500);
@@ -1083,42 +1164,8 @@
                     }
                 });
 
-                // Setup zoom control
-                const zoomSlider = document.getElementById('zoomSlider');
-                const zoomLevel = document.getElementById('zoomLevel');
-                zoomSlider.addEventListener('input', (e) => {
-                    currentZoom = parseFloat(e.target.value);
-                    zoomLevel.textContent = currentZoom.toFixed(1) + 'x';
-                    applyZoom();
-                });
-
             } catch (err) {
-                console.error('Error enumerating cameras:', err);
-            }
-        }
-
-        function applyZoom() {
-            const videoElement = document.getElementById('qr-reader')?.querySelector('video');
-            if (videoElement && videoElement.videoWidth > 0) {
-                const minZoom = 1;
-                const maxZoom = Math.min(4, videoElement.videoWidth / 300);
-                const constrainedZoom = Math.max(minZoom, Math.min(currentZoom, maxZoom));
-                
-                try {
-                    const track = videoStream?.getVideoTracks()[0];
-                    if (track && track.getCapabilities) {
-                        const capabilities = track.getCapabilities();
-                        if (capabilities.zoom) {
-                            const zoomValue = capabilities.zoom.min + 
-                                (constrainedZoom - 1) * (capabilities.zoom.max - capabilities.zoom.min) / 9;
-                            track.applyConstraints({ zoom: zoomValue }).catch(err => 
-                                console.log('Zoom not supported:', err)
-                            );
-                        }
-                    }
-                } catch (err) {
-                    console.log('Cannot apply zoom:', err);
-                }
+                console.error('Camera enumeration error:', err);
             }
         }
 
@@ -1213,16 +1260,11 @@
                     onScanError
                 );
 
-                // Capture the video stream for zoom control
-                const videoElement = document.getElementById('qr-reader')?.querySelector('video');
-                if (videoElement && videoElement.srcObject) {
-                    videoStream = videoElement.srcObject;
-                    // Apply zoom after a short delay to allow video to load
-                    setTimeout(applyZoom, 500);
-                }
-
                 document.getElementById('scanStatus').textContent = '📹 Point barcode at center...';
                 console.log('✅ Scanner started (html5-qrcode fallback)');
+                
+                // Also try canvas-based detection in parallel for better coverage
+                await tryCanvasBarcodeDection();
 
             } catch (err) {
                 console.error('❌ Scanner error:', err);
