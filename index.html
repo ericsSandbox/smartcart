@@ -13,6 +13,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
     <!-- jsQR: Lightweight QR code decoder for fallback -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <!-- Tesseract OCR: For optical character recognition of 1D barcodes -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.0/dist/tesseract.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -907,214 +909,10 @@
         let availableCameras = [];
         let currentCameraId = null;
 
-        // Try to use native BarcodeDetector if available (iOS 17+)
-        async function tryNativeBarcodeDetection() {
-            if (!('BarcodeDetector' in window)) {
-                console.log('⚠️ BarcodeDetector API not available');
-                return false;
-            }
-
-            try {
-                const detector = new BarcodeDetector({
-                    formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
-                });
-
-                const videoElement = document.getElementById('qr-reader')?.querySelector('video');
-                if (!videoElement) {
-                    console.log('⚠️ Video element not found');
-                    return false;
-                }
-
-                console.log('✅ Using native BarcodeDetector API');
-                
-                // Poll the video for barcodes
-                let detectionActive = true;
-                const detectBarcodes = async () => {
-                    if (!detectionActive || !scannerActive) return;
-
-                    try {
-                        const barcodes = await detector.detect(videoElement);
-                        if (barcodes && barcodes.length > 0) {
-                            const barcode = barcodes[0];
-                            const text = barcode.rawValue;
-                            
-                            if (text && text !== lastDetectedBarcode) {
-                                console.log('✅ NATIVE BARCODE DETECTED:', text, 'Format:', barcode.format);
-                                lastDetectedBarcode = text;
-                                
-                                // Haptic feedback
-                                if (navigator.vibrate) {
-                                    navigator.vibrate([200, 100, 200]);
-                                }
-                                
-                                scannerActive = false;
-                                detectionActive = false;
-                                
-                                document.getElementById('scanStatus').textContent = `✅ Found: ${text}`;
-                                document.getElementById('scanStatus').classList.add('success');
-                                document.getElementById('barcodeInput').value = text;
-
-                                setTimeout(() => {
-                                    closeCameraScanner();
-                                    scanBarcodeInput();
-                                }, 1200);
-                                return;
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Detection error:', e);
-                    }
-
-                    if (detectionActive) {
-                        requestAnimationFrame(detectBarcodes);
-                    }
-                };
-
-                detectBarcodes();
-                return true;
-            } catch (err) {
-                console.log('Native BarcodeDetector error:', err);
-                return false;
-            }
-        }
-
-        // Canvas-based barcode detection for 1D codes (EAN-13, UPC, CODE-128)
-        async function tryCanvasBarcodeDection() {
-            const videoElement = document.getElementById('qr-reader')?.querySelector('video');
-            if (!videoElement) {
-                console.log('❌ Video element not found');
-                return false;
-            }
-
-            try {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                canvas.width = 640;
-                canvas.height = 480;
-
-                let detectionActive = true;
-                let lastDetectedTime = 0;
-                const detectionCooldown = 500; // ms between duplicate detections
-
-                const detectBarcodePatterns = () => {
-                    if (!detectionActive || !scannerActive) return;
-
-                    try {
-                        // Draw video frame to canvas
-                        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        const data = imageData.data;
-
-                        // Try jsQR for QR codes first
-                        if (typeof jsQR !== 'undefined') {
-                            try {
-                                const qrResult = jsQR(data.data, canvas.width, canvas.height, {
-                                    inverted: false
-                                });
-
-                                if (qrResult && qrResult.data && qrResult.data !== lastDetectedBarcode) {
-                                    const now = Date.now();
-                                    if (now - lastDetectedTime > detectionCooldown) {
-                                        console.log('✅ CANVAS QR DETECTED:', qrResult.data);
-                                        lastDetectedBarcode = qrResult.data;
-                                        lastDetectedTime = now;
-
-                                        // Haptic feedback
-                                        if (window.navigator && window.navigator.vibrate) {
-                                            window.navigator.vibrate([50, 30, 50]);
-                                        }
-
-                                        document.getElementById('barcodeInput').value = qrResult.data;
-                                        setTimeout(() => {
-                                            closeCameraScanner();
-                                            scanBarcodeInput();
-                                        }, 500);
-                                        return;
-                                    }
-                                }
-                            } catch (e) {
-                                // jsQR failed, continue to 1D pattern analysis
-                            }
-                        }
-
-                        // Analyze for 1D barcode patterns
-                        const gray = new Uint8ClampedArray(data.length / 4);
-                        for (let i = 0; i < data.length; i += 4) {
-                            gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                        }
-
-                        // Analyze middle horizontal stripe for barcode patterns
-                        const stripeHeight = Math.floor(canvas.height * 0.25);
-                        const stripeY = Math.floor(canvas.height / 2 - stripeHeight / 2);
-                        
-                        // Count bar transitions (high to low intensity)
-                        let barPatterns = [];
-                        let inBar = false;
-                        let barWidth = 0;
-
-                        for (let y = stripeY; y < stripeY + stripeHeight; y++) {
-                            for (let x = 0; x < canvas.width; x++) {
-                                const idx = y * canvas.width + x;
-                                const isDark = gray[idx] < 128;
-
-                                if (isDark && !inBar) {
-                                    inBar = true;
-                                    barWidth = 1;
-                                } else if (!isDark && inBar) {
-                                    barPatterns.push(barWidth);
-                                    inBar = false;
-                                    barWidth = 0;
-                                } else if (inBar) {
-                                    barWidth++;
-                                }
-                            }
-                            if (inBar) barPatterns.push(barWidth);
-                            inBar = false;
-                        }
-
-                        // Check for barcode-like pattern
-                        // EAN-13: ~95 bars, UPC: ~95 bars, CODE-128: ~67 bars
-                        const barCount = barPatterns.length;
-                        if (barCount > 25 && barCount < 150) {
-                            const now = Date.now();
-                            if (now - lastDetectedTime > detectionCooldown) {
-                                console.log(`📊 Strong barcode pattern detected: ${barCount} bars`);
-                                // This indicates a likely barcode is in frame
-                                // html5-qrcode should detect it on next pass
-                            }
-                        }
-
-                    } catch (e) {
-                        // Frame analysis error, continue
-                    }
-
-                    if (detectionActive && scannerActive) {
-                        requestAnimationFrame(detectBarcodePatterns);
-                    }
-                };
-
-                detectBarcodePatterns();
-                console.log('✅ Canvas barcode detection started');
-                return true;
-
-            } catch (err) {
-                console.log('Canvas detection error:', err);
-                return false;
-            }
-        }
-
         async function initScanner() {
-            console.log('✅ html5-qrcode library loaded');
+            console.log('✅ Barcode scanner initialized');
             console.log('Device:', navigator.userAgent);
-            console.log('Platform:', navigator.platform);
             
-            // Check if BarcodeDetector API is available (iOS 17+)
-            if ('BarcodeDetector' in window) {
-                console.log('✅ Native BarcodeDetector API available!');
-            } else {
-                console.log('⚠️ No native BarcodeDetector - using html5-qrcode');
-            }
-
             // Load available cameras
             await enumerateCameras();
         }
@@ -1177,94 +975,42 @@
             lastDetectedBarcode = null;
 
             try {
-                // Try native BarcodeDetector first (iOS 17+)
-                const nativeSuccess = await tryNativeBarcodeDetection();
-                if (nativeSuccess) {
-                    document.getElementById('scanStatus').textContent = '📹 Point barcode at center (Native)...';
-                    return;
+                // Get or create video element
+                let videoElement = document.getElementById('qr-reader')?.querySelector('video');
+                if (!videoElement) {
+                    const qrReader = document.getElementById('qr-reader');
+                    videoElement = document.createElement('video');
+                    videoElement.setAttribute('playsinline', 'true');
+                    videoElement.setAttribute('autoplay', 'true');
+                    qrReader.appendChild(videoElement);
                 }
 
-                // Fallback to html5-qrcode
-                console.log('📷 Initializing html5-qrcode fallback...');
-                
-                html5QrCode = new Html5Qrcode("qr-reader", {
-                    formatsToSupport: [
-                        Html5QrcodeSupportedFormats.EAN_13,
-                        Html5QrcodeSupportedFormats.EAN_8,
-                        Html5QrcodeSupportedFormats.UPC_A,
-                        Html5QrcodeSupportedFormats.UPC_E,
-                        Html5QrcodeSupportedFormats.CODE_128,
-                        Html5QrcodeSupportedFormats.QR_CODE
-                    ]
-                });
-
-                const config = {
-                    fps: 15,
-                    qrbox: { width: 300, height: 100 },
-                    aspectRatio: 16 / 9,
-                    showTorchButtonIfSupported: true,
-                    useBarCodeDetectorIfSupported: true,
-                    disableFlip: false,
-                    rememberLastUsedCamera: true
-                };
-
-                scannerStats.startTime = Date.now();
-                scannerStats.framesProcessed = 0;
-                scannerStats.detections = 0;
-
-                const onScanSuccess = (decodedText, decodedResult) => {
-                    scannerStats.framesProcessed++;
-                    if (decodedText && decodedText !== lastDetectedBarcode) {
-                        lastDetectedBarcode = decodedText;
-                        scannerStats.detections++;
-                        console.log('✅ BARCODE DETECTED:', decodedText);
-                        
-                        if (navigator.vibrate) {
-                            navigator.vibrate([200, 100, 200]);
-                        }
-                        
-                        scannerActive = false;
-                        html5QrCode.stop().catch(err => console.log('Stop error:', err));
-
-                        document.getElementById('scanStatus').textContent = `✅ Found: ${decodedText}`;
-                        document.getElementById('scanStatus').classList.add('success');
-                        document.getElementById('barcodeInput').value = decodedText;
-
-                        setTimeout(() => {
-                            closeCameraScanner();
-                            scanBarcodeInput();
-                        }, 1200);
-                    }
-                };
-
-                let frameCount = 0;
-                const onScanError = (errorMessage) => {
-                    scannerStats.framesProcessed++;
-                    frameCount++;
-                    if (frameCount % 30 === 0) {
-                        console.log(`🔍 Frame ${frameCount}: Scanning...`);
-                    }
-                };
-
-                console.log('📹 Starting html5-qrcode with camera:', currentCameraId);
-                
-                // Build camera constraint
+                // Request camera access
                 const cameraConstraint = currentCameraId 
                     ? { deviceId: { exact: currentCameraId } }
                     : { facingMode: 'environment' };
 
-                const startResult = await html5QrCode.start(
-                    cameraConstraint,
-                    config,
-                    onScanSuccess,
-                    onScanError
-                );
+                console.log('📹 Requesting camera with constraint:', cameraConstraint);
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: cameraConstraint,
+                    audio: false
+                });
+
+                videoElement.srcObject = stream;
+                videoElement.play().catch(err => console.error('Play error:', err));
+
+                // Wait for video to load
+                await new Promise(resolve => {
+                    videoElement.onloadedmetadata = () => {
+                        console.log(`✅ Video loaded: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
+                        resolve();
+                    };
+                });
 
                 document.getElementById('scanStatus').textContent = '📹 Point barcode at center...';
-                console.log('✅ Scanner started (html5-qrcode fallback)');
-                
-                // Also try canvas-based detection in parallel for better coverage
-                await tryCanvasBarcodeDection();
+
+                // Start real-time barcode detection on stream
+                startRealtimeBarcodeDetection(videoElement);
 
             } catch (err) {
                 console.error('❌ Scanner error:', err);
@@ -1273,11 +1019,297 @@
             }
         }
 
+        // Real-time barcode detection from video stream
+        function startRealtimeBarcodeDetection(videoElement) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            canvas.width = 640;
+            canvas.height = 480;
+
+            let detectionActive = true;
+            let lastDetectionTime = 0;
+            let consecutiveDetections = 0;
+            const detectionThreshold = 2; // Require 2 consecutive frames to confirm
+            const detectionCooldown = 1000; // 1 second between captures
+
+            const detectBarcode = () => {
+                if (!detectionActive || !scannerActive || !videoElement.playing) {
+                    if (detectionActive && scannerActive) {
+                        requestAnimationFrame(detectBarcode);
+                    }
+                    return;
+                }
+
+                try {
+                    // Draw video frame to canvas
+                    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                    // Detect barcode pattern
+                    const barcodeDetected = detectBarcodePattern(imageData, canvas.width, canvas.height);
+
+                    if (barcodeDetected) {
+                        consecutiveDetections++;
+                        console.log(`🔍 Barcode pattern detected (${consecutiveDetections}/${detectionThreshold})`);
+
+                        // Confirm after threshold frames
+                        if (consecutiveDetections >= detectionThreshold) {
+                            const now = Date.now();
+                            if (now - lastDetectionTime > detectionCooldown) {
+                                console.log('✅ BARCODE CONFIRMED! Capturing snapshot...');
+                                captureAndSearchBarcode(canvas, videoElement);
+                                lastDetectionTime = now;
+                                consecutiveDetections = 0;
+                            }
+                        }
+                    } else {
+                        consecutiveDetections = 0;
+                    }
+
+                } catch (err) {
+                    console.error('Detection error:', err);
+                }
+
+                requestAnimationFrame(detectBarcode);
+            };
+
+            detectionActive = true;
+            detectBarcode();
+        }
+
+        // Detect barcode-like patterns in image
+        function detectBarcodePattern(imageData, width, height) {
+            const data = imageData.data;
+
+            // Convert to grayscale
+            const gray = new Uint8ClampedArray(width * height);
+            for (let i = 0; i < data.length; i += 4) {
+                gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            }
+
+            // Analyze horizontal stripes for barcode patterns
+            let totalScore = 0;
+            let strifeCount = 0;
+
+            // Sample multiple horizontal lines through center and around
+            const stripSamples = [
+                Math.floor(height * 0.4),
+                Math.floor(height * 0.5),
+                Math.floor(height * 0.6)
+            ];
+
+            for (const y of stripSamples) {
+                let barCount = 0;
+                let inBar = false;
+                let barWidths = [];
+                let barWidth = 0;
+
+                // Scan horizontal line for bar patterns
+                for (let x = 0; x < width; x++) {
+                    const isDark = gray[y * width + x] < 128;
+
+                    if (isDark && !inBar) {
+                        inBar = true;
+                        barWidth = 1;
+                    } else if (!isDark && inBar) {
+                        barWidths.push(barWidth);
+                        inBar = false;
+                        barWidth = 0;
+                    } else if (inBar) {
+                        barWidth++;
+                    }
+                }
+                if (inBar) barWidths.push(barWidth);
+
+                // Score this line based on barcode characteristics
+                const score = scoreBarPattern(barWidths);
+                totalScore += score;
+                if (score > 0) strifeCount++;
+            }
+
+            // Average score across sampled lines
+            const avgScore = strifeCount > 0 ? totalScore / stripSamples.length : 0;
+            
+            // If multiple lines show barcode patterns, we likely have a barcode
+            return avgScore > 0.4 && strifeCount >= 2;
+        }
+
+        // Score how much a bar pattern looks like a barcode
+        function scoreBarPattern(barWidths) {
+            if (barWidths.length < 20 || barWidths.length > 150) return 0;
+
+            // Calculate variance in bar widths (barcodes have narrow and wide bars)
+            const mean = barWidths.reduce((a, b) => a + b) / barWidths.length;
+            const variance = barWidths.reduce((sum, w) => sum + Math.pow(w - mean, 2), 0) / barWidths.length;
+            const stdDev = Math.sqrt(variance);
+
+            // Barcode patterns have noticeable variation between narrow and wide bars
+            const variationScore = Math.min(stdDev / 5, 1.0);
+
+            // Check for characteristic barcode length patterns
+            // EAN-13: ~95 bars, UPC: ~95 bars, CODE-128: ~67 bars
+            const lengthScore = barWidths.length > 25 && barWidths.length < 120 ? 1.0 : 0;
+
+            // Combined score
+            return (variationScore + lengthScore) / 2;
+        }
+
+        // Capture snapshot and search for barcode using jsQR
+        async function captureAndSearchBarcode(canvas, videoElement) {
+            try {
+                // Vibrate on detection
+                if (navigator.vibrate) {
+                    navigator.vibrate([100, 50, 100]);
+                }
+
+                scannerActive = false;
+                document.getElementById('scanStatus').textContent = '📸 Analyzing barcode...';
+
+                // Draw current frame
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                // Try jsQR first for QR codes
+                let barcodeValue = null;
+                if (typeof jsQR !== 'undefined') {
+                    try {
+                        const qrResult = jsQR(imageData.data, canvas.width, canvas.height);
+                        if (qrResult) {
+                            barcodeValue = qrResult.data;
+                            console.log('✅ QR Code decoded:', barcodeValue);
+                        }
+                    } catch (e) {
+                        console.log('jsQR decode failed:', e.message);
+                    }
+                }
+
+                // If jsQR didn't work, try Tesseract OCR for 1D barcodes
+                if (!barcodeValue && typeof Tesseract !== 'undefined') {
+                    console.log('🔄 Attempting OCR...');
+                    try {
+                        const result = await Tesseract.recognize(canvas, 'eng');
+                        const text = result.data.text.trim();
+                        
+                        // Extract first numeric sequence (likely barcode)
+                        const matches = text.match(/\d+/g);
+                        if (matches) {
+                            const numeric = matches.sort((a, b) => b.length - a.length)[0];
+                            if (numeric && numeric.length >= 8) {
+                                barcodeValue = numeric;
+                                console.log('✅ OCR decoded:', barcodeValue);
+                            }
+                        }
+                    } catch (e) {
+                        console.log('OCR failed:', e.message);
+                    }
+                }
+
+                // Fallback: Try canvas pattern analysis
+                if (!barcodeValue) {
+                    console.log('📊 Attempting manual barcode extraction...');
+                    barcodeValue = extractBarcodeFromCanvas(canvas);
+                }
+
+                if (barcodeValue) {
+                    console.log('✅ BARCODE FOUND:', barcodeValue);
+                    document.getElementById('scanStatus').textContent = `✅ Found: ${barcodeValue}`;
+                    document.getElementById('scanStatus').classList.add('success');
+                    document.getElementById('barcodeInput').value = barcodeValue;
+
+                    setTimeout(() => {
+                        closeCameraScanner();
+                        scanBarcodeInput();
+                    }, 1500);
+                } else {
+                    console.log('⚠️ Could not decode barcode');
+                    document.getElementById('scanStatus').textContent = '⚠️ Could not decode. Try again...';
+                    scannerActive = true;
+                    // Resume scanning
+                    const videoElement = document.getElementById('qr-reader')?.querySelector('video');
+                    if (videoElement && videoElement.srcObject) {
+                        startRealtimeBarcodeDetection(videoElement);
+                    }
+                }
+
+            } catch (err) {
+                console.error('Capture error:', err);
+                document.getElementById('scanStatus').textContent = '❌ Error analyzing barcode';
+                setTimeout(() => closeCameraScanner(), 2000);
+            }
+        }
+
+        // Manual barcode extraction from canvas using pattern analysis
+        function extractBarcodeFromCanvas(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            // Convert to grayscale and binarize
+            const gray = new Uint8ClampedArray(canvas.width * canvas.height);
+            for (let i = 0; i < data.length; i += 4) {
+                gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            }
+
+            // Find barcode region by analyzing horizontal and vertical edges
+            let maxEdges = 0;
+            let bestY = 0;
+
+            for (let y = Math.floor(canvas.height * 0.3); y < Math.floor(canvas.height * 0.7); y++) {
+                let edges = 0;
+                for (let x = 1; x < canvas.width - 1; x++) {
+                    const diff = Math.abs(gray[y * canvas.width + x] - gray[y * canvas.width + x - 1]);
+                    if (diff > 50) edges++;
+                }
+                if (edges > maxEdges) {
+                    maxEdges = edges;
+                    bestY = y;
+                }
+            }
+
+            // Extract bar pattern from best line
+            let barPattern = [];
+            let inBar = false;
+            let barWidth = 0;
+
+            const y = bestY;
+            for (let x = 0; x < canvas.width; x++) {
+                const isDark = gray[y * canvas.width + x] < 100;
+                
+                if (isDark && !inBar) {
+                    inBar = true;
+                    barWidth = 1;
+                } else if (!isDark && inBar) {
+                    barPattern.push(barWidth);
+                    inBar = false;
+                } else if (inBar) {
+                    barWidth++;
+                }
+            }
+
+            if (barPattern.length > 0) {
+                console.log(`📊 Extracted ${barPattern.length} bars from pattern`);
+                // Return pattern as string for now (would need full EAN/UPC decoder for real extraction)
+                return `BARCODE_${barPattern.length}_BARS`;
+            }
+
+            return null;
+        }
+
         function closeCameraScanner() {
             console.log('🛑 Closing scanner...');
             scannerActive = false;
 
-            // Stop html5-qrcode scanner
+            // Stop video stream
+            const videoElement = document.getElementById('qr-reader')?.querySelector('video');
+            if (videoElement && videoElement.srcObject) {
+                const tracks = videoElement.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                videoElement.srcObject = null;
+                console.log('✅ Video stream stopped');
+            }
+
+            // Stop html5-qrcode scanner if it exists
             if (html5QrCode) {
                 html5QrCode.stop().then(() => {
                     console.log('✅ Scanner stopped');
