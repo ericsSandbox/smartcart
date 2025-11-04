@@ -9,8 +9,8 @@
     <meta name="theme-color" content="#3b82f6">
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
-    <!-- Instascan: Simple, reliable barcode scanner for iOS -->
-    <script src="https://cdn.jsdelivr.net/npm/instascan@1.8.0/build/instascan.min.js"></script>
+    <!-- html5-qrcode: ZXing-based 1D/2D barcode scanner, optimized for mobile -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -867,91 +867,122 @@
             event.target.classList.add('active');
         }
 
-        let scanner = null;
-        let cameraStream = null;
-
-        let scanner = null;
+        let html5QrCode = null;
 
         async function initScanner() {
-            console.log('Scanner library loaded');
+            console.log('✅ html5-qrcode library loaded');
         }
 
         async function openCameraScanner() {
-            console.log('Opening barcode scanner...');
+            console.log('📷 Opening barcode scanner...');
             document.getElementById('cameraContainer').classList.add('active');
-            document.getElementById('scanStatus').textContent = '📹 Starting camera...';
+            document.getElementById('scanStatus').textContent = '📹 Requesting camera...';
             scannerActive = true;
             lastDetectedBarcode = null;
 
             try {
+                // Initialize html5-qrcode reader
                 const videoElement = document.getElementById('qr-reader');
-                scanner = new Instascan.Scanner({
-                    video: videoElement,
-                    mirror: false
+                html5QrCode = new Html5Qrcode("qr-reader", {
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.QR_CODE
+                    ]
                 });
 
-                scanner.addListener('scan', function(content) {
-                    if (content && content !== lastDetectedBarcode) {
-                        lastDetectedBarcode = content;
-                        console.log('Barcode detected:', content);
-                        scannerActive = false;
-                        
-                        document.getElementById('scanStatus').textContent = 'Found: ' + content;
-                        document.getElementById('scanStatus').classList.add('success');
-                        document.getElementById('barcodeInput').value = content;
+                // Configuration for 1D barcodes
+                const config = {
+                    fps: 10,
+                    qrbox: { width: 300, height: 100 }, // Narrow horizontal box for 1D codes
+                    aspectRatio: 16 / 9,
+                    showTorchButtonIfSupported: true,
+                    useBarCodeDetectorIfSupported: true
+                };
 
+                // Success callback
+                const onScanSuccess = (decodedText, decodedResult) => {
+                    if (decodedText && decodedText !== lastDetectedBarcode) {
+                        lastDetectedBarcode = decodedText;
+                        console.log('✅ BARCODE DETECTED:', decodedText);
+                        scannerActive = false;
+
+                        // Stop scanning
+                        html5QrCode.stop().catch(err => console.log('Stop error:', err));
+
+                        // Update UI
+                        document.getElementById('scanStatus').textContent = `✅ Found: ${decodedText}`;
+                        document.getElementById('scanStatus').classList.add('success');
+                        document.getElementById('barcodeInput').value = decodedText;
+
+                        // Lookup product
                         setTimeout(() => {
                             closeCameraScanner();
                             scanBarcodeInput();
-                        }, 800);
+                        }, 1200);
                     }
-                });
+                };
 
-                Instascan.Camera.request().then(function(camera) {
-                    console.log('Camera granted');
-                    scanner.start(camera);
-                    document.getElementById('scanStatus').textContent = '📹 Center barcode in frame...';
-                }).catch(function(e) {
-                    console.error('Camera error:', e);
-                    document.getElementById('scanStatus').textContent = 'Camera access denied';
-                    setTimeout(() => closeCameraScanner(), 2000);
-                });
+                // Start scanning with camera constraints
+                const constraints = {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                };
 
-            } catch (err) {
-                console.error('Error:', err);
-                document.getElementById('scanStatus').textContent = 'Scanner error';
-                setTimeout(() => closeCameraScanner(), 2000);
-            }
-        }
+                await html5QrCode.start(
+                    { facingMode: 'environment' },
+                    config,
+                    onScanSuccess,
+                    (errorMessage) => {
+                        // Silent - ignore failed decoding attempts
+                    }
+                );
+
+                document.getElementById('scanStatus').textContent = '📹 Point barcode at center...';
+                console.log('📹 Scanner started successfully');
 
             } catch (err) {
                 console.error('❌ Scanner error:', err);
-                document.getElementById('scanStatus').textContent = '❌ ' + (err.message || 'Scanner error');
-                document.getElementById('scanStatus').style.color = '#ef4444';
+                document.getElementById('scanStatus').textContent = '❌ ' + (err.message || 'Camera error');
+                setTimeout(() => closeCameraScanner(), 2000);
+            }
+        }
                 setTimeout(() => closeCameraScanner(), 2000);
             }
         }
 
         function closeCameraScanner() {
-            console.log('Closing scanner...');
+            console.log('🛑 Closing scanner...');
             scannerActive = false;
 
-            // Stop Instascan scanner
-            if (scanner) {
-                try {
-                    scanner.stop();
-                    scanner = null;
-                    console.log('Scanner stopped');
-                } catch (err) {
-                    console.error('Error:', err);
-                }
+            // Stop html5-qrcode scanner
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    console.log('✅ Scanner stopped');
+                    html5QrCode = null;
+                }).catch(err => {
+                    console.error('Stop error:', err);
+                    html5QrCode = null;
+                });
             }
 
             // Reset UI
-            document.getElementById('scanStatus').textContent = 'Ready...';
+            document.getElementById('scanStatus').textContent = '📷 Ready...';
             document.getElementById('scanStatus').classList.remove('success');
             document.getElementById('cameraContainer').classList.remove('active');
         }
+
+        // Handle page visibility for camera lifecycle
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && html5QrCode) {
+                console.log('📵 Page hidden, stopping scanner');
+                html5QrCode.stop().catch(err => console.log('Stop error:', err));
+            }
+        });
 
         window.scanBarcodeInput = async function() {
             const barcode = document.getElementById('barcodeInput').value.trim();
