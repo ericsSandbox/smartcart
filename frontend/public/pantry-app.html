@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SmartCart Pantry">
+    <meta name="theme-color" content="#3b82f6">
+    <title>SmartCart Pantry Inventory</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>📦</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>📦</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f3f4f6;
+            color: #111827;
+            padding-bottom: 100px;
+        }
+
+        .safe-area-top {
+            height: max(env(safe-area-inset-top, 0px), 8px);
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        }
+
+        header {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        header .subtitle {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-card .number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+
+        .stat-card .label {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        input[type="search"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="search"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-top: 20px;
+            margin-bottom: 12px;
+            padding-left: 4px;
+        }
+
+        .item-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .item-card {
+            background: white;
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+
+        .item-card:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        .item-card.low-stock {
+            border-left: 4px solid #ef4444;
+        }
+
+        .item-card.expired {
+            border-left: 4px solid #d97706;
+            opacity: 0.7;
+        }
+
+        .item-card.staple {
+            border-left: 4px solid #8b5cf6;
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-name {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
+        .item-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .item-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .item-qty {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 12px;
+        }
+
+        .qty-btn {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .qty-btn:active {
+            background: #e5e7eb;
+        }
+
+        .qty-display {
+            min-width: 40px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .delete-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: #fee2e2;
+            color: #dc2626;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 8px;
+        }
+
+        .delete-btn:active {
+            background: #fecaca;
+        }
+
+        .add-item-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99;
+            transition: all 0.2s;
+        }
+
+        .add-item-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: flex-end;
+        }
+
+        .modal.active {
+            display: flex;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .modal-content {
+            background: white;
+            width: 100%;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+        }
+
+        .btn-primary:active {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .btn-secondary:active {
+            background: #d1d5db;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7280;
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+        }
+
+        .warning-banner {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .warning-banner.danger {
+            background: #fee2e2;
+            border-color: #fecaca;
+        }
+
+        .warning-banner .icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .warning-banner .text {
+            font-size: 13px;
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="safe-area-top"></div>
+    
+    <header>
+        <h1>📦 Pantry Inventory</h1>
+        <div class="subtitle">Track what's in your kitchen</div>
+    </header>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card">
+                <div class="number" id="totalCount">0</div>
+                <div class="label">Total Items</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="lowStockCount">0</div>
+                <div class="label">Low Stock</div>
+            </div>
+            <div class="stat-card">
+                <div class="number" id="expiredCount">0</div>
+                <div class="label">Expiring Soon</div>
+            </div>
+        </div>
+
+        <div id="warningBanner"></div>
+
+        <div class="search-box">
+            <input type="search" id="searchInput" placeholder="🔍 Search items..." />
+        </div>
+
+        <div id="stapleSection" style="display:none;">
+            <div class="section-title">⭐ Staple Items</div>
+            <div class="item-list" id="stapleList"></div>
+        </div>
+
+        <div>
+            <div class="section-title">All Items</div>
+            <div class="item-list" id="itemList"></div>
+            <div class="empty-state" id="emptyState">
+                <div class="icon">📭</div>
+                <p>Your pantry is empty. Add items to get started!</p>
+            </div>
+        </div>
+    </div>
+
+    <button class="add-item-btn" id="addItemBtn" title="Add Item">+</button>
+
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">Add Item to Pantry</div>
+            <form id="addForm">
+                <div class="form-group">
+                    <label>Item Name *</label>
+                    <input type="text" id="itemName" placeholder="e.g., Milk, Bread, Chicken" required>
+                </div>
+                <div class="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" id="itemQty" placeholder="1" value="1" min="0.1" step="0.1" required>
+                </div>
+                <div class="form-group">
+                    <label>Unit</label>
+                    <select id="itemUnit">
+                        <option>unit</option>
+                        <option>lb</option>
+                        <option>oz</option>
+                        <option>cup</option>
+                        <option>tbsp</option>
+                        <option>tsp</option>
+                        <option>ml</option>
+                        <option>l</option>
+                        <option>piece</option>
+                        <option>package</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Expires</label>
+                    <input type="date" id="itemExpires">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="itemStaple">
+                    <label for="itemStaple">Mark as staple item (reorder frequently)</label>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Data Management
+        let items = [];
+        const STORAGE_KEY = 'smartcart_pantry_items';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadItems();
+            setupEventListeners();
+            renderUI();
+        });
+
+        function loadItems() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            items = stored ? JSON.parse(stored) : [];
+        }
+
+        function saveItems() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        }
+
+        function setupEventListeners() {
+            document.getElementById('addItemBtn').addEventListener('click', () => {
+                document.getElementById('addModal').classList.add('active');
+            });
+
+            document.getElementById('cancelBtn').addEventListener('click', () => {
+                document.getElementById('addModal').classList.remove('active');
+                document.getElementById('addForm').reset();
+            });
+
+            document.getElementById('addForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                addItem();
+            });
+
+            document.getElementById('searchInput').addEventListener('input', renderUI);
+
+            document.getElementById('addModal').addEventListener('click', (e) => {
+                if (e.target.id === 'addModal') {
+                    document.getElementById('addModal').classList.remove('active');
+                }
+            });
+        }
+
+        function addItem() {
+            const item = {
+                id: Date.now(),
+                name: document.getElementById('itemName').value,
+                quantity: parseFloat(document.getElementById('itemQty').value),
+                unit: document.getElementById('itemUnit').value,
+                expires_at: document.getElementById('itemExpires').value || null,
+                staple: document.getElementById('itemStaple').checked,
+                added_at: new Date().toISOString()
+            };
+
+            items.push(item);
+            saveItems();
+            renderUI();
+
+            document.getElementById('addForm').reset();
+            document.getElementById('addModal').classList.remove('active');
+        }
+
+        function deleteItem(id) {
+            if (confirm('Delete this item?')) {
+                items = items.filter(item => item.id !== id);
+                saveItems();
+                renderUI();
+            }
+        }
+
+        function updateQuantity(id, change) {
+            const item = items.find(i => i.id === id);
+            if (item) {
+                item.quantity = Math.max(0, item.quantity + change);
+                if (item.quantity === 0) {
+                    deleteItem(id);
+                } else {
+                    saveItems();
+                    renderUI();
+                }
+            }
+        }
+
+        function renderUI() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = items.filter(item => 
+                item.name.toLowerCase().includes(search)
+            );
+
+            const staples = filtered.filter(i => i.staple);
+            const regular = filtered.filter(i => !i.staple);
+
+            // Stats
+            const lowStock = items.filter(i => i.quantity <= 1).length;
+            const expired = items.filter(i => isExpired(i.expires_at)).length;
+
+            document.getElementById('totalCount').textContent = items.length;
+            document.getElementById('lowStockCount').textContent = lowStock;
+            document.getElementById('expiredCount').textContent = expired;
+
+            // Warning Banner
+            const warningBanner = document.getElementById('warningBanner');
+            if (expired > 0 || lowStock > 0) {
+                warningBanner.innerHTML = `
+                    ${expired > 0 ? `<div class="warning-banner danger">
+                        <div class="icon">⚠️</div>
+                        <div class="text"><strong>${expired} item(s)</strong> expired or expiring soon</div>
+                    </div>` : ''}
+                    ${lowStock > 0 ? `<div class="warning-banner">
+                        <div class="icon">ℹ️</div>
+                        <div class="text"><strong>${lowStock} item(s)</strong> running low</div>
+                    </div>` : ''}
+                `;
+            } else {
+                warningBanner.innerHTML = '';
+            }
+
+            // Staples Section
+            if (staples.length > 0) {
+                document.getElementById('stapleSection').style.display = 'block';
+                document.getElementById('stapleList').innerHTML = staples.map(item => 
+                    createItemCard(item)
+                ).join('');
+            } else {
+                document.getElementById('stapleSection').style.display = 'none';
+            }
+
+            // Regular Items
+            if (regular.length > 0) {
+                document.getElementById('emptyState').style.display = 'none';
+                document.getElementById('itemList').innerHTML = regular.map(item => 
+                    createItemCard(item)
+                ).join('');
+            } else if (filtered.length === 0 && search) {
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('emptyState').innerHTML = '<div class="icon">🔍</div><p>No items found</p>';
+                document.getElementById('itemList').innerHTML = '';
+            } else {
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('itemList').innerHTML = '';
+            }
+
+            // Attach event listeners
+            document.querySelectorAll('.qty-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = parseInt(e.target.dataset.id);
+                    const change = parseInt(e.target.dataset.change);
+                    updateQuantity(id, change);
+                });
+            });
+
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = parseInt(e.target.dataset.id);
+                    deleteItem(id);
+                });
+            });
+        }
+
+        function createItemCard(item) {
+            const isLow = item.quantity <= 1;
+            const isExpired = isExpired(item.expires_at);
+            const expiresIn = getExpiresIn(item.expires_at);
+
+            let cardClass = 'item-card';
+            if (isExpired) cardClass += ' expired';
+            else if (isLow) cardClass += ' low-stock';
+            if (item.staple) cardClass += ' staple';
+
+            return `
+                <div class="${cardClass}">
+                    <div class="item-info">
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-meta">
+                            <span>📦 ${item.quantity} ${item.unit}</span>
+                            ${expiresIn ? `<span>${expiresIn}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="item-qty">
+                        <button class="qty-btn" data-id="${item.id}" data-change="-1" title="Remove">−</button>
+                        <div class="qty-display">${item.quantity}</div>
+                        <button class="qty-btn" data-id="${item.id}" data-change="1" title="Add">+</button>
+                        <button class="delete-btn" data-id="${item.id}" title="Delete">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function isExpired(expiryDate) {
+            if (!expiryDate) return false;
+            return new Date(expiryDate) < new Date();
+        }
+
+        function getExpiresIn(expiryDate) {
+            if (!expiryDate) return null;
+            const exp = new Date(expiryDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const diffTime = exp - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) return '🔴 Expired';
+            if (diffDays === 0) return '🟠 Expires today';
+            if (diffDays === 1) return '🟡 Expires tomorrow';
+            if (diffDays <= 7) return `🟡 Expires in ${diffDays} days`;
+            if (diffDays <= 30) return `🟢 Expires in ${diffDays} days`;
+            return null;
+        }
+
+        // PWA Install prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            console.log('PWA install prompt available');
+        });
+    </script>
+</body>
+</html>

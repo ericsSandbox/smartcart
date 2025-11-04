@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Library Comparison Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .lib-test {
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin: 15px 0;
+            background: #0a0a0a;
+            border-radius: 5px;
+        }
+        h2 {
+            color: #ffff00;
+            margin-top: 0;
+        }
+        .result {
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 3px solid;
+            border-radius: 3px;
+        }
+        .result.success {
+            border-color: #00ff00;
+            background: #001a00;
+            color: #00ff00;
+        }
+        .result.error {
+            border-color: #ff0000;
+            background: #1a0000;
+            color: #ff6666;
+        }
+        .result.info {
+            border-color: #00ccff;
+            background: #001a33;
+            color: #00ccff;
+        }
+        button {
+            background: #00ff00;
+            border: none;
+            color: #000;
+            padding: 10px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            font-family: monospace;
+        }
+        button:hover {
+            background: #00cc00;
+        }
+        .test-image {
+            max-width: 300px;
+            max-height: 300px;
+            border: 1px solid #00ff00;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔬 Barcode Library Compatibility Test</h1>
+    <p>Testing different barcode libraries against your actual Bush Baked Beans screenshot</p>
+
+    <!-- Test Image Upload -->
+    <div class="lib-test">
+        <h2>📸 Upload Test Image</h2>
+        <input type="file" id="imageInput" accept="image/*">
+        <img id="displayImage" class="test-image" style="display:none;">
+        <div id="imageStatus"></div>
+    </div>
+
+    <!-- Library 1: html5-qrcode (current) -->
+    <div class="lib-test">
+        <h2>📚 html5-qrcode (Current CDN)</h2>
+        <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/dist/html5-qrcode.min.js"></script>
+        <button onclick="testHtml5Qrcode()">Test html5-qrcode</button>
+        <div id="html5-result"></div>
+    </div>
+
+    <!-- Library 2: ZXing (classic 1D support) -->
+    <div class="lib-test">
+        <h2>📚 ZXing JavaScript Port</h2>
+        <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+        <button onclick="testZXing()">Test ZXing</button>
+        <div id="zxing-result"></div>
+    </div>
+
+    <!-- Library 2b: Dynamsoft Barcode Reader (free trial - proven 1D support) -->
+    <div class="lib-test">
+        <h2>📚 Dynamsoft Barcode Reader</h2>
+        <button onclick="testDynamsoft()">Test Dynamsoft</button>
+        <div id="dynamsoft-result"></div>
+    </div>
+
+    <!-- Library 3: jsbarcode-image (for barcode generation/reading) -->
+    <div class="lib-test">
+        <h2>📚 Barcode Detection via Canvas Analysis</h2>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+        <button onclick="testCanvasAnalysis()">Test Canvas Analysis</button>
+        <div id="canvas-result"></div>
+    </div>
+
+    <!-- Library 4: Quagga2 (we tried this but let's verify) -->
+    <div class="lib-test">
+        <h2>📚 Quagga2 (Attempt)</h2>
+        <button onclick="testQuagga2()">Test Quagga2</button>
+        <div id="quagga-result"></div>
+    </div>
+
+    <!-- Library 5: Try html5-qrcode with direct video processing -->
+    <div class="lib-test">
+        <h2>📚 Custom Canvas + Format Detection</h2>
+        <button onclick="testDirectCanvas()">Test Direct Canvas Processing</button>
+        <div id="canvas-direct-result"></div>
+    </div>
+
+    <script>
+        let uploadedImage = null;
+
+        // Image upload handler
+        document.getElementById('imageInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                uploadedImage = evt.target.result;
+                const img = document.getElementById('displayImage');
+                img.src = uploadedImage;
+                img.style.display = 'block';
+                document.getElementById('imageStatus').innerHTML = 
+                    `<div class="result info">✅ Image loaded: ${file.name} (${(file.size/1024).toFixed(1)}KB)</div>`;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        function resultDiv(elementId, success, message) {
+            const div = document.getElementById(elementId);
+            div.innerHTML = `<div class="result ${success ? 'success' : 'error'}">${success ? '✅' : '❌'} ${message}</div>`;
+        }
+
+        async function testHtml5Qrcode() {
+            if (!uploadedImage) {
+                resultDiv('html5-result', false, 'No image uploaded');
+                return;
+            }
+            resultDiv('html5-result', true, 'Decoding with html5-qrcode...');
+            
+            try {
+                // Create instance and use scanFile on it
+                const decoder = new Html5Qrcode("displayImage", {
+                    formatsToSupport: ['QR_CODE', 'EAN_13', 'EAN_8', 'UPC_A', 'CODE_128', 'CODE_39']
+                });
+
+                // Try scanFileV2 first (newer API)
+                try {
+                    const result = await decoder.scanFileV2(uploadedImage, 2000);
+                    resultDiv('html5-result', true, `✅ DECODED (scanFileV2): ${result.decodedText}`);
+                    return;
+                } catch (e1) {
+                    // Fall back to scanFile
+                    try {
+                        const result = await decoder.scanFile(uploadedImage, true);
+                        resultDiv('html5-result', true, `✅ DECODED (scanFile): ${result.decodedText}`);
+                        return;
+                    } catch (e2) {
+                        throw new Error(`Both APIs failed. scanFileV2: ${e1.message}, scanFile: ${e2.message}`);
+                    }
+                }
+            } catch (err) {
+                resultDiv('html5-result', false, `Error: ${err.message}`);
+            }
+        }
+
+        async function testZXing() {
+            if (!uploadedImage) {
+                resultDiv('zxing-result', false, 'No image uploaded');
+                return;
+            }
+
+            try {
+                const img = new Image();
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+
+                    try {
+                        const codeReader = new ZXing.BrowserMultiFormatReader();
+                        const result = await codeReader.decodeFromImageElement(img);
+                        resultDiv('zxing-result', true, `✅ DECODED: ${result.text}`);
+                    } catch (err) {
+                        resultDiv('zxing-result', false, `No barcode detected: ${err.message}`);
+                    }
+                };
+                img.src = uploadedImage;
+            } catch (err) {
+                resultDiv('zxing-result', false, `Setup error: ${err.message}`);
+            }
+        }
+
+        async function testCanvasAnalysis() {
+            if (!uploadedImage) {
+                resultDiv('canvas-result', false, 'No image uploaded');
+                return;
+            }
+
+            try {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+
+                    // Analyze image for barcode characteristics
+                    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                    const data = imageData.data;
+                    
+                    let barcodePatterns = 0;
+                    let totalContrast = 0;
+                    
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i+1];
+                        const b = data[i+2];
+                        const gray = (r + g + b) / 3;
+                        
+                        // High contrast pixels (likely barcode lines)
+                        if ((gray < 50 && i > 4) || (gray > 200 && i > 4)) {
+                            const prevGray = (data[i-4] + data[i-3] + data[i-2]) / 3;
+                            if (Math.abs(gray - prevGray) > 100) {
+                                barcodePatterns++;
+                                totalContrast += Math.abs(gray - prevGray);
+                            }
+                        }
+                    }
+
+                    const avgContrast = totalContrast / Math.max(1, barcodePatterns);
+                    if (barcodePatterns > 1000 && avgContrast > 80) {
+                        resultDiv('canvas-result', true, 
+                            `Image contains barcode-like patterns (${barcodePatterns} high-contrast pixels, avg contrast: ${avgContrast.toFixed(0)})`);
+                    } else {
+                        resultDiv('canvas-result', false, 
+                            `No obvious barcode detected (${barcodePatterns} patterns, contrast: ${avgContrast.toFixed(0)})`);
+                    }
+                };
+                img.src = uploadedImage;
+            } catch (err) {
+                resultDiv('canvas-result', false, `Error: ${err.message}`);
+            }
+        }
+
+        async function testQuagga2() {
+            resultDiv('quagga-result', false, 'Quagga2 not available on CDN - library missing');
+        }
+
+        async function testDirectCanvas() {
+            if (!uploadedImage) {
+                resultDiv('canvas-direct-result', false, 'No image uploaded');
+                return;
+            }
+
+            try {
+                const img = new Image();
+                img.onload = async () => {
+                    // Convert to canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+
+                    // Convert to grayscale
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    
+                    for (let i = 0; i < data.length; i += 4) {
+                        const gray = (data[i] + data[i+1] + data[i+2]) / 3;
+                        data[i] = data[i+1] = data[i+2] = gray > 127 ? 255 : 0; // Binary
+                    }
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                    
+                    // Try to decode with html5-qrcode using the canvas
+                    if (typeof Html5Qrcode !== 'undefined') {
+                        try {
+                            // Check if there's a method to decode from canvas
+                            const methods = Object.keys(Html5Qrcode.prototype);
+                            resultDiv('canvas-direct-result', true, 
+                                `Html5Qrcode prototype has: ${methods.slice(0, 5).join(', ')}...`);
+                        } catch (e) {
+                            resultDiv('canvas-direct-result', false, `Cannot access prototype: ${e.message}`);
+                        }
+                    }
+                };
+                img.src = uploadedImage;
+            } catch (err) {
+                resultDiv('canvas-direct-result', false, `Error: ${err.message}`);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            document.getElementById('imageStatus').innerHTML = 
+                `<div class="result info">👆 Upload your barcode screenshot to test library compatibility</div>`;
+        });
+    </script>
+</body>
+</html>

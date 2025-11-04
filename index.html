@@ -11,6 +11,8 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
     <!-- html5-qrcode: ZXing-based 1D/2D barcode scanner, optimized for mobile -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+    <!-- jsQR: Lightweight QR code decoder for fallback -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <style>
         * {
             margin: 0;
@@ -513,6 +515,7 @@
             gap: 8px;
             justify-content: center;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         #cameraControls button {
@@ -524,6 +527,75 @@
             font-weight: bold;
             cursor: pointer;
             font-size: 14px;
+        }
+
+        #cameraControls button:hover {
+            background: #2563eb;
+        }
+
+        #cameraControls button:active {
+            background: #1d4ed8;
+        }
+
+        #cameraSelect {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #cameraSelect option {
+            background: #1f2937;
+            color: white;
+        }
+
+        .zoom-control {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+
+        #zoomSlider {
+            width: 120px;
+            height: 6px;
+            border-radius: 3px;
+            background: #555;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        #zoomSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+
+        #zoomSlider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+        }
+
+        #zoomLevel {
+            color: white;
+            font-size: 12px;
+            min-width: 30px;
+            text-align: center;
         }
 
         #cameraControls button:active {
@@ -715,6 +787,14 @@
                 <div id="scannerReticle"></div>
                 <div class="scanner-hint">Center barcode in frame</div>
                 <div id="cameraControls">
+                    <select id="cameraSelect">
+                        <option value="">📷 Select Camera</option>
+                    </select>
+                    <div class="zoom-control">
+                        <span>🔍</span>
+                        <input type="range" id="zoomSlider" min="1" max="10" value="1" step="0.1">
+                        <span id="zoomLevel">1x</span>
+                    </div>
                     <button type="button" class="close" onclick="closeCameraScanner()">✕ Close</button>
                 </div>
             </div>
@@ -868,9 +948,178 @@
         }
 
         let html5QrCode = null;
+        let scannerStats = {
+            framesProcessed: 0,
+            detections: 0,
+            startTime: null
+        };
+
+        let availableCameras = [];
+        let currentCameraId = null;
+        let currentZoom = 1;
+        let videoStream = null;
+
+        // Try to use native BarcodeDetector if available (iOS 17+)
+        async function tryNativeBarcodeDetection() {
+            if (!('BarcodeDetector' in window)) {
+                console.log('⚠️ BarcodeDetector API not available');
+                return false;
+            }
+
+            try {
+                const detector = new BarcodeDetector({
+                    formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
+                });
+
+                const videoElement = document.getElementById('qr-reader')?.querySelector('video');
+                if (!videoElement) {
+                    console.log('⚠️ Video element not found');
+                    return false;
+                }
+
+                console.log('✅ Using native BarcodeDetector API');
+                
+                // Poll the video for barcodes
+                let detectionActive = true;
+                const detectBarcodes = async () => {
+                    if (!detectionActive || !scannerActive) return;
+
+                    try {
+                        const barcodes = await detector.detect(videoElement);
+                        if (barcodes && barcodes.length > 0) {
+                            const barcode = barcodes[0];
+                            const text = barcode.rawValue;
+                            
+                            if (text && text !== lastDetectedBarcode) {
+                                console.log('✅ NATIVE BARCODE DETECTED:', text, 'Format:', barcode.format);
+                                lastDetectedBarcode = text;
+                                
+                                // Haptic feedback
+                                if (navigator.vibrate) {
+                                    navigator.vibrate([200, 100, 200]);
+                                }
+                                
+                                scannerActive = false;
+                                detectionActive = false;
+                                
+                                document.getElementById('scanStatus').textContent = `✅ Found: ${text}`;
+                                document.getElementById('scanStatus').classList.add('success');
+                                document.getElementById('barcodeInput').value = text;
+
+                                setTimeout(() => {
+                                    closeCameraScanner();
+                                    scanBarcodeInput();
+                                }, 1200);
+                                return;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Detection error:', e);
+                    }
+
+                    if (detectionActive) {
+                        requestAnimationFrame(detectBarcodes);
+                    }
+                };
+
+                detectBarcodes();
+                return true;
+            } catch (err) {
+                console.log('Native BarcodeDetector error:', err);
+                return false;
+            }
+        }
 
         async function initScanner() {
             console.log('✅ html5-qrcode library loaded');
+            console.log('Device:', navigator.userAgent);
+            console.log('Platform:', navigator.platform);
+            
+            // Check if BarcodeDetector API is available (iOS 17+)
+            if ('BarcodeDetector' in window) {
+                console.log('✅ Native BarcodeDetector API available!');
+            } else {
+                console.log('⚠️ No native BarcodeDetector - using html5-qrcode');
+            }
+
+            // Load available cameras
+            await enumerateCameras();
+        }
+
+        async function enumerateCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                availableCameras = devices.filter(device => device.kind === 'videoinput');
+                
+                const cameraSelect = document.getElementById('cameraSelect');
+                cameraSelect.innerHTML = '<option value="">📷 Select Camera</option>';
+                
+                availableCameras.forEach((camera, index) => {
+                    const option = document.createElement('option');
+                    option.value = camera.deviceId;
+                    option.textContent = camera.label || `Camera ${index + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+
+                if (availableCameras.length > 0) {
+                    console.log(`✅ Found ${availableCameras.length} camera(s)`);
+                    currentCameraId = availableCameras[0].deviceId;
+                    if (cameraSelect.options.length > 1) {
+                        cameraSelect.options[1].selected = true;
+                    }
+                } else {
+                    console.log('⚠️ No cameras found');
+                }
+
+                cameraSelect.addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        currentCameraId = e.target.value;
+                        console.log('📷 Switched to camera:', currentCameraId);
+                        // Restart scanner with new camera
+                        if (scannerActive && html5QrCode) {
+                            closeCameraScanner();
+                            setTimeout(openCameraScanner, 500);
+                        }
+                    }
+                });
+
+                // Setup zoom control
+                const zoomSlider = document.getElementById('zoomSlider');
+                const zoomLevel = document.getElementById('zoomLevel');
+                zoomSlider.addEventListener('input', (e) => {
+                    currentZoom = parseFloat(e.target.value);
+                    zoomLevel.textContent = currentZoom.toFixed(1) + 'x';
+                    applyZoom();
+                });
+
+            } catch (err) {
+                console.error('Error enumerating cameras:', err);
+            }
+        }
+
+        function applyZoom() {
+            const videoElement = document.getElementById('qr-reader')?.querySelector('video');
+            if (videoElement && videoElement.videoWidth > 0) {
+                const minZoom = 1;
+                const maxZoom = Math.min(4, videoElement.videoWidth / 300);
+                const constrainedZoom = Math.max(minZoom, Math.min(currentZoom, maxZoom));
+                
+                try {
+                    const track = videoStream?.getVideoTracks()[0];
+                    if (track && track.getCapabilities) {
+                        const capabilities = track.getCapabilities();
+                        if (capabilities.zoom) {
+                            const zoomValue = capabilities.zoom.min + 
+                                (constrainedZoom - 1) * (capabilities.zoom.max - capabilities.zoom.min) / 9;
+                            track.applyConstraints({ zoom: zoomValue }).catch(err => 
+                                console.log('Zoom not supported:', err)
+                            );
+                        }
+                    }
+                } catch (err) {
+                    console.log('Cannot apply zoom:', err);
+                }
+            }
         }
 
         async function openCameraScanner() {
@@ -881,8 +1130,16 @@
             lastDetectedBarcode = null;
 
             try {
-                // Initialize html5-qrcode reader
-                const videoElement = document.getElementById('qr-reader');
+                // Try native BarcodeDetector first (iOS 17+)
+                const nativeSuccess = await tryNativeBarcodeDetection();
+                if (nativeSuccess) {
+                    document.getElementById('scanStatus').textContent = '📹 Point barcode at center (Native)...';
+                    return;
+                }
+
+                // Fallback to html5-qrcode
+                console.log('📷 Initializing html5-qrcode fallback...');
+                
                 html5QrCode = new Html5Qrcode("qr-reader", {
                     formatsToSupport: [
                         Html5QrcodeSupportedFormats.EAN_13,
@@ -894,31 +1151,38 @@
                     ]
                 });
 
-                // Configuration for 1D barcodes
                 const config = {
-                    fps: 10,
-                    qrbox: { width: 300, height: 100 }, // Narrow horizontal box for 1D codes
+                    fps: 15,
+                    qrbox: { width: 300, height: 100 },
                     aspectRatio: 16 / 9,
                     showTorchButtonIfSupported: true,
-                    useBarCodeDetectorIfSupported: true
+                    useBarCodeDetectorIfSupported: true,
+                    disableFlip: false,
+                    rememberLastUsedCamera: true
                 };
 
-                // Success callback
+                scannerStats.startTime = Date.now();
+                scannerStats.framesProcessed = 0;
+                scannerStats.detections = 0;
+
                 const onScanSuccess = (decodedText, decodedResult) => {
+                    scannerStats.framesProcessed++;
                     if (decodedText && decodedText !== lastDetectedBarcode) {
                         lastDetectedBarcode = decodedText;
+                        scannerStats.detections++;
                         console.log('✅ BARCODE DETECTED:', decodedText);
+                        
+                        if (navigator.vibrate) {
+                            navigator.vibrate([200, 100, 200]);
+                        }
+                        
                         scannerActive = false;
-
-                        // Stop scanning
                         html5QrCode.stop().catch(err => console.log('Stop error:', err));
 
-                        // Update UI
                         document.getElementById('scanStatus').textContent = `✅ Found: ${decodedText}`;
                         document.getElementById('scanStatus').classList.add('success');
                         document.getElementById('barcodeInput').value = decodedText;
 
-                        // Lookup product
                         setTimeout(() => {
                             closeCameraScanner();
                             scanBarcodeInput();
@@ -926,24 +1190,39 @@
                     }
                 };
 
-                // Start scanning with camera constraints
-                const constraints = {
-                    facingMode: { ideal: 'environment' },
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                let frameCount = 0;
+                const onScanError = (errorMessage) => {
+                    scannerStats.framesProcessed++;
+                    frameCount++;
+                    if (frameCount % 30 === 0) {
+                        console.log(`🔍 Frame ${frameCount}: Scanning...`);
+                    }
                 };
 
-                await html5QrCode.start(
-                    { facingMode: 'environment' },
+                console.log('📹 Starting html5-qrcode with camera:', currentCameraId);
+                
+                // Build camera constraint
+                const cameraConstraint = currentCameraId 
+                    ? { deviceId: { exact: currentCameraId } }
+                    : { facingMode: 'environment' };
+
+                const startResult = await html5QrCode.start(
+                    cameraConstraint,
                     config,
                     onScanSuccess,
-                    (errorMessage) => {
-                        // Silent - ignore failed decoding attempts
-                    }
+                    onScanError
                 );
 
+                // Capture the video stream for zoom control
+                const videoElement = document.getElementById('qr-reader')?.querySelector('video');
+                if (videoElement && videoElement.srcObject) {
+                    videoStream = videoElement.srcObject;
+                    // Apply zoom after a short delay to allow video to load
+                    setTimeout(applyZoom, 500);
+                }
+
                 document.getElementById('scanStatus').textContent = '📹 Point barcode at center...';
-                console.log('📹 Scanner started successfully');
+                console.log('✅ Scanner started (html5-qrcode fallback)');
 
             } catch (err) {
                 console.error('❌ Scanner error:', err);
