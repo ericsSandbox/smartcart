@@ -743,6 +743,9 @@
                 <div id="qr-reader" class="active"></div>
                 <div id="scannerReticle"></div>
                 <div class="scanner-hint">Center barcode in frame</div>
+                <div id="debugDisplay" style="position: absolute; top: 60px; left: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #0f0; font-family: monospace; font-size: 11px; padding: 8px; border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 2; display: none;">
+                    <div id="debugLog"></div>
+                </div>
                 <div id="cameraControls">
                     <select id="cameraSelect">
                         <option value="">📷 Select Camera</option>
@@ -908,6 +911,33 @@
 
         let availableCameras = [];
         let currentCameraId = null;
+        
+        // Debug logging system
+        const debugLog = [];
+        function addDebugLog(msg) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${msg}`;
+            debugLog.push(logEntry);
+            if (debugLog.length > 15) debugLog.shift(); // Keep last 15 lines
+            updateDebugDisplay();
+            console.log(msg);
+        }
+        
+        function updateDebugDisplay() {
+            const display = document.getElementById('debugLog');
+            if (display) {
+                display.innerHTML = debugLog.map(line => `<div>${line}</div>`).join('');
+                // Auto-scroll to bottom
+                display.parentElement.scrollTop = display.parentElement.scrollHeight;
+            }
+        }
+        
+        function showDebugDisplay(show = true) {
+            const display = document.getElementById('debugDisplay');
+            if (display) {
+                display.style.display = show ? 'block' : 'none';
+            }
+        }
 
         async function initScanner() {
             console.log('✅ Barcode scanner initialized');
@@ -969,6 +999,10 @@
 
         async function openCameraScanner() {
             console.log('📷 Opening barcode scanner...');
+            debugLog.length = 0; // Clear previous logs
+            showDebugDisplay(true);
+            addDebugLog('📷 Scanner opened');
+            
             document.getElementById('cameraContainer').classList.add('active');
             document.getElementById('scanStatus').textContent = '📹 Requesting camera...';
             scannerActive = true;
@@ -1031,7 +1065,7 @@
             let frameCount = 0;
             const detectionCooldown = 1000; // 1 second between captures
 
-            console.log(`📸 Starting detection on ${canvas.width}x${canvas.height} video`);
+            addDebugLog(`📸 Detection started (${canvas.width}x${canvas.height})`);
 
             const detectBarcode = () => {
                 if (!detectionActive || !scannerActive) {
@@ -1049,13 +1083,13 @@
                     const result = detectBarcodePattern(imageData, canvas.width, canvas.height);
 
                     if (frameCount % 15 === 0) {
-                        console.log(`📊 Frame ${frameCount}: Score=${result.score.toFixed(2)}, Stripes=${result.stripesDetected}, Detected=${result.detected}`);
+                        addDebugLog(`Frame ${frameCount}: Score=${result.score.toFixed(2)}, Stripes=${result.stripesDetected}, Detected=${result.detected}`);
                     }
 
                     if (result.detected) {
                         const now = Date.now();
                         if (now - lastDetectionTime > detectionCooldown) {
-                            console.log('✅ BARCODE DETECTED! Capturing snapshot...');
+                            addDebugLog('✅ PATTERN DETECTED! Capturing...');
                             detectionActive = false;
                             captureAndSearchBarcode(canvas, videoElement);
                             lastDetectionTime = now;
@@ -1196,7 +1230,7 @@
 
                 // Try jsQR first for QR codes - it's the most reliable
                 if (typeof jsQR !== 'undefined') {
-                    console.log('🔍 Trying jsQR decoder...');
+                    addDebugLog('🔍 jsQR: Trying decoder...');
                     try {
                         const qrResult = jsQR(imageData.data, canvas.width, canvas.height, {
                             inverted: false
@@ -1204,18 +1238,20 @@
                         
                         if (qrResult && qrResult.data) {
                             barcodeValue = qrResult.data;
-                            console.log('✅ QR Code decoded by jsQR:', barcodeValue);
+                            addDebugLog('✅ jsQR DECODED: ' + barcodeValue);
                         } else {
-                            console.log('jsQR: No QR code found');
+                            addDebugLog('jsQR: No QR found');
                         }
                     } catch (e) {
-                        console.log('jsQR error:', e.message);
+                        addDebugLog('jsQR ERROR: ' + e.message);
                     }
+                } else {
+                    addDebugLog('❌ jsQR not available');
                 }
 
                 // Try with inverted colors (sometimes helps)
                 if (!barcodeValue && typeof jsQR !== 'undefined') {
-                    console.log('🔍 Trying jsQR with inverted colors...');
+                    addDebugLog('🔍 jsQR: Trying inverted...');
                     try {
                         const qrResult = jsQR(imageData.data, canvas.width, canvas.height, {
                             inverted: true
@@ -1223,53 +1259,62 @@
                         
                         if (qrResult && qrResult.data) {
                             barcodeValue = qrResult.data;
-                            console.log('✅ QR Code decoded (inverted):', barcodeValue);
+                            addDebugLog('✅ jsQR DECODED (inv): ' + barcodeValue);
+                        } else {
+                            addDebugLog('jsQR: No QR (inv)');
                         }
                     } catch (e) {
-                        console.log('jsQR inverted error:', e.message);
+                        addDebugLog('jsQR inv ERROR: ' + e.message);
                     }
                 }
 
                 // Try Tesseract OCR for 1D barcodes
                 if (!barcodeValue && typeof Tesseract !== 'undefined') {
-                    console.log('🔄 Attempting Tesseract OCR...');
+                    addDebugLog('🔄 Tesseract: Starting OCR...');
                     try {
                         const result = await Tesseract.recognize(canvas, 'eng', {
                             logger: m => {
                                 if (m.status === 'recognizing') {
                                     const progress = Math.round(m.progress * 100);
                                     if (progress % 25 === 0) {
-                                        console.log(`  OCR progress: ${progress}%`);
+                                        addDebugLog(`  OCR: ${progress}%`);
                                     }
                                 }
                             }
                         });
                         
                         const text = result.data.text.trim();
-                        console.log('OCR result text:', text);
+                        addDebugLog('OCR text: ' + text.substring(0, 30));
                         
                         // Extract numeric sequences (barcodes)
                         const matches = text.match(/\d{8,}/g);
                         if (matches) {
+                            addDebugLog(`Found ${matches.length} number sequences`);
                             const numeric = matches.sort((a, b) => b.length - a.length)[0];
                             if (numeric && numeric.length >= 8 && numeric.length <= 15) {
                                 barcodeValue = numeric;
-                                console.log('✅ OCR decoded:', barcodeValue);
+                                addDebugLog('✅ OCR DECODED: ' + barcodeValue);
+                            } else {
+                                addDebugLog('Longest match invalid: ' + numeric);
                             }
+                        } else {
+                            addDebugLog('No numeric sequences found');
                         }
                     } catch (e) {
-                        console.log('OCR error:', e.message);
+                        addDebugLog('OCR ERROR: ' + e.message);
                     }
+                } else {
+                    addDebugLog('❌ Tesseract not available');
                 }
 
                 // Fallback: Try canvas pattern analysis
                 if (!barcodeValue) {
-                    console.log('📊 Attempting manual extraction...');
+                    addDebugLog('📊 Manual extraction...');
                     barcodeValue = extractBarcodeFromCanvas(canvas);
                 }
 
                 if (barcodeValue) {
-                    console.log('✅ BARCODE FOUND:', barcodeValue);
+                    addDebugLog('✅ FOUND: ' + barcodeValue);
                     document.getElementById('scanStatus').textContent = `✅ Found: ${barcodeValue}`;
                     document.getElementById('scanStatus').classList.add('success');
                     document.getElementById('barcodeInput').value = barcodeValue;
