@@ -789,20 +789,28 @@
         </div>
     </div>
 
-    <div class="modal" id="debugLogModal">
-        <div class="modal-content" style="width: 90%; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;">
-            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <span>🔍 Scan Debug Log</span>
-                <button type="button" class="close" onclick="document.getElementById('debugLogModal').classList.remove('active')" style="font-size: 20px; cursor: pointer; background: none; border: none; color: #666;">✕</button>
+    <!-- Persistent Debug Log Modal (not a standard modal to prevent auto-close) -->
+    <div id="debugLogModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 2000; align-items: center; justify-content: center; animation: fadeIn 0.3s ease-out;">
+        <div style="background: white; width: 90%; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid #eee;">
+                <span style="font-size: 18px; font-weight: bold;">🔍 Scan Debug Log</span>
+                <button type="button" onclick="document.getElementById('debugLogModal').style.display = 'none'" style="font-size: 24px; cursor: pointer; background: none; border: none; color: #666;">✕</button>
             </div>
-            <div id="debugLogViewer" style="flex: 1; overflow-y: auto; background: #1a1a1a; color: #0f0; font-family: monospace; font-size: 12px; padding: 15px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; margin-bottom: 15px;"></div>
-            <div class="button-group" style="display: flex; gap: 10px;">
-                <button type="button" class="btn btn-primary" onclick="copyDebugLogFromModal()" style="flex: 1;">📋 Copy Log</button>
-                <button type="button" class="btn btn-secondary" onclick="clearDebugLog(); document.getElementById('debugLogViewer').textContent = ''; addDebugLog('Log cleared')" style="flex: 1;">🗑️ Clear</button>
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('debugLogModal').classList.remove('active')" style="flex: 1;">Close</button>
+            <div id="debugLogViewer" style="flex: 1; overflow-y: auto; background: #1a1a1a; color: #0f0; font-family: monospace; font-size: 12px; padding: 15px; white-space: pre-wrap; word-wrap: break-word; margin: 0;"></div>
+            <div style="display: flex; gap: 10px; padding: 20px; border-top: 1px solid #eee;">
+                <button type="button" onclick="copyDebugLogFromModal()" style="flex: 1; padding: 10px 16px; background: #4CAF50; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer;">📋 Copy Log</button>
+                <button type="button" onclick="clearDebugLog(); document.getElementById('debugLogViewer').textContent = ''; addDebugLog('Log cleared')" style="flex: 1; padding: 10px 16px; background: #f44336; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer;">🗑️ Clear</button>
+                <button type="button" onclick="document.getElementById('debugLogModal').style.display = 'none'" style="flex: 1; padding: 10px 16px; background: #2196F3; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer;">Close</button>
             </div>
         </div>
     </div>
+
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
 
     <script>
         const PANTRY_KEY = 'smartcart_pantry';
@@ -1124,8 +1132,10 @@
             let lastDetectionTime = 0;
             let frameCount = 0;
             let consecutiveDetections = 0;
+            let detectionHistory = []; // Track bar counts from recent frames
             const detectionThreshold = 3; // Require 3 consecutive frames
             const detectionCooldown = 2000; // 2 seconds between captures
+            const barCountTolerance = 3; // Allow ±3 bars variation
 
             addDebugLog(`📸 Detection started (${canvas.width}x${canvas.height})`);
 
@@ -1145,26 +1155,47 @@
                     const result = detectBarcodePattern(imageData, canvas.width, canvas.height);
 
                     if (frameCount % 60 === 0) {
-                        addDebugLog(`Frame ${frameCount}: Score=${result.score.toFixed(2)}, Bars=${result.contrast}, Stripes=${result.stripesDetected}`);
+                        addDebugLog(`Frame ${frameCount}: Score=${result.score.toFixed(2)}, Bars=${result.contrast}, Stripes=${result.stripesDetected}, ConsecDetect=${consecutiveDetections}, History=${JSON.stringify(detectionHistory)}`);
                     }
 
                     if (result.detected) {
+                        // Track this detection's bar count
+                        detectionHistory.push(result.contrast);
                         consecutiveDetections++;
                         
-                        // Only trigger after 3 consecutive confirmed frames
-                        if (consecutiveDetections >= detectionThreshold) {
-                            const now = Date.now();
-                            if (now - lastDetectionTime > detectionCooldown) {
-                                addDebugLog(`✅ CONFIRMED! ${consecutiveDetections} frames, ${result.contrast} bars`);
-                                detectionActive = false;
-                                captureAndSearchBarcode(canvas, videoElement);
-                                lastDetectionTime = now;
+                        // Keep only the last 3 detections
+                        if (detectionHistory.length > detectionThreshold) {
+                            detectionHistory.shift();
+                        }
+                        
+                        // Check if we have 3 consistent detections
+                        if (consecutiveDetections >= detectionThreshold && detectionHistory.length === detectionThreshold) {
+                            // Check if bar counts are consistent (within tolerance)
+                            const minBars = Math.min(...detectionHistory);
+                            const maxBars = Math.max(...detectionHistory);
+                            const barsConsistent = (maxBars - minBars) <= barCountTolerance;
+                            
+                            if (barsConsistent) {
+                                const now = Date.now();
+                                if (now - lastDetectionTime > detectionCooldown) {
+                                    const avgBars = Math.round(detectionHistory.reduce((a,b) => a+b) / detectionHistory.length);
+                                    addDebugLog(`✅ CONFIRMED! 3 frames (${detectionHistory[0]}, ${detectionHistory[1]}, ${detectionHistory[2]} bars) = ~${avgBars} bars`);
+                                    detectionActive = false;
+                                    captureAndSearchBarcode(canvas, videoElement);
+                                    lastDetectionTime = now;
+                                    consecutiveDetections = 0;
+                                    detectionHistory = [];
+                                }
+                            } else {
+                                addDebugLog(`⚠️ Bars inconsistent: ${detectionHistory.join(', ')} (range too wide)`);
                                 consecutiveDetections = 0;
+                                detectionHistory = [];
                             }
                         }
                     } else {
                         // Reset consecutive count if not detected
                         consecutiveDetections = 0;
+                        detectionHistory = [];
                     }
 
                 } catch (err) {
@@ -1496,7 +1527,7 @@
             const debugLogContent = document.getElementById('debugLog')?.textContent || '';
             if (debugLogContent.trim()) {
                 document.getElementById('debugLogViewer').textContent = debugLogContent;
-                document.getElementById('debugLogModal').classList.add('active');
+                document.getElementById('debugLogModal').style.display = 'flex';
             }
         }
 
