@@ -745,6 +745,10 @@
                 <div class="scanner-hint">Center barcode in frame</div>
                 <div id="debugDisplay" style="position: absolute; top: 60px; left: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #0f0; font-family: monospace; font-size: 11px; padding: 8px; border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 2; display: none;">
                     <div id="debugLog"></div>
+                    <div style="margin-top: 8px; border-top: 1px solid #0f0; padding-top: 8px; display: flex; gap: 5px;">
+                        <button onclick="copyDebugLog()" style="flex: 1; padding: 4px; background: #0f0; color: #000; border: none; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer;">📋 Copy Log</button>
+                        <button onclick="clearDebugLog()" style="flex: 1; padding: 4px; background: #f00; color: #fff; border: none; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer;">🗑 Clear</button>
+                    </div>
                 </div>
                 <div id="cameraControls">
                     <select id="cameraSelect">
@@ -938,6 +942,22 @@
                 display.style.display = show ? 'block' : 'none';
             }
         }
+        
+        function copyDebugLog() {
+            const logText = debugLog.join('\n');
+            navigator.clipboard.writeText(logText).then(() => {
+                alert('📋 Debug log copied to clipboard!');
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                alert('❌ Could not copy log');
+            });
+        }
+        
+        function clearDebugLog() {
+            debugLog.length = 0;
+            updateDebugDisplay();
+            addDebugLog('🗑 Log cleared');
+        }
 
         async function initScanner() {
             console.log('✅ Barcode scanner initialized');
@@ -1082,7 +1102,7 @@
                     // Detect barcode pattern
                     const result = detectBarcodePattern(imageData, canvas.width, canvas.height);
 
-                    if (frameCount % 15 === 0) {
+                    if (frameCount % 30 === 0) {
                         addDebugLog(`Frame ${frameCount}: Score=${result.score.toFixed(2)}, Stripes=${result.stripesDetected}, Detected=${result.detected}`);
                     }
 
