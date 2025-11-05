@@ -743,13 +743,18 @@
                 <div id="qr-reader" class="active"></div>
                 <div id="scannerReticle"></div>
                 <div class="scanner-hint">Center barcode in frame</div>
-                <div id="debugDisplay" style="position: absolute; top: 60px; left: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #0f0; font-family: monospace; font-size: 11px; padding: 8px; border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 2; display: none;">
-                    <div id="debugLog"></div>
-                    <div style="margin-top: 8px; border-top: 1px solid #0f0; padding-top: 8px; display: flex; gap: 5px;">
-                        <button onclick="copyDebugLog()" style="flex: 1; padding: 4px; background: #0f0; color: #000; border: none; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer;">📋 Copy Log</button>
-                        <button onclick="clearDebugLog()" style="flex: 1; padding: 4px; background: #f00; color: #fff; border: none; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer;">🗑 Clear</button>
+                <div id="debugDisplay" style="position: fixed; top: 50px; left: 10px; right: 10px; background: rgba(0,0,0,0.85); color: #0f0; font-family: monospace; font-size: 11px; padding: 8px; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 1001; display: none; border: 2px solid #0f0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #0f0; padding-bottom: 8px;">
+                        <strong>🔍 DEBUG LOG</strong>
+                        <div style="display: flex; gap: 5px;">
+                            <button onclick="copyDebugLog()" style="padding: 4px 8px; background: #0f0; color: #000; border: none; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer;">📋 Copy</button>
+                            <button onclick="clearDebugLog()" style="padding: 4px 8px; background: #f00; color: #fff; border: none; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer;">Clear</button>
+                            <button onclick="toggleDebugDisplay()" style="padding: 4px 8px; background: #00f; color: #fff; border: none; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer;">Hide</button>
+                        </div>
                     </div>
+                    <div id="debugLog" style="max-height: 150px; overflow-y: auto;"></div>
                 </div>
+                <button id="debugToggleBtn" onclick="toggleDebugDisplay()" style="position: fixed; bottom: 120px; right: 10px; padding: 8px 12px; background: #0f0; color: #000; border: none; border-radius: 5px; font-size: 12px; font-weight: bold; cursor: pointer; z-index: 1000; display: none;">🔍 Show Log</button>
                 <div id="cameraControls">
                     <select id="cameraSelect">
                         <option value="">📷 Select Camera</option>
@@ -938,9 +943,19 @@
         
         function showDebugDisplay(show = true) {
             const display = document.getElementById('debugDisplay');
+            const btn = document.getElementById('debugToggleBtn');
             if (display) {
                 display.style.display = show ? 'block' : 'none';
+                if (btn) btn.style.display = show ? 'none' : 'block';
             }
+        }
+        
+        function toggleDebugDisplay() {
+            const display = document.getElementById('debugDisplay');
+            const btn = document.getElementById('debugToggleBtn');
+            const isVisible = display.style.display !== 'none';
+            display.style.display = isVisible ? 'none' : 'block';
+            if (btn) btn.style.display = isVisible ? 'block' : 'none';
         }
         
         function copyDebugLog() {
