@@ -1148,100 +1148,90 @@
         function detectBarcodePattern(imageData, width, height) {
             const data = imageData.data;
 
-            // Convert to grayscale with better contrast detection
+            // Convert to grayscale 
             const gray = new Uint8ClampedArray(width * height);
-            let minBright = 255;
-            let maxBright = 0;
-
             for (let i = 0; i < data.length; i += 4) {
-                const brightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                gray[i / 4] = brightness;
-                if (brightness < minBright) minBright = brightness;
-                if (brightness > maxBright) maxBright = brightness;
+                gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
             }
 
-            const contrast = maxBright - minBright;
+            // Sample more lines - scan the middle 40% of image vertically
+            const stripSamples = [];
+            for (let i = 0; i < 15; i++) {
+                stripSamples.push(Math.floor(height * (0.3 + (i * 0.04))));
+            }
 
-            // Sample more lines for better detection
-            const stripSamples = [
-                Math.floor(height * 0.35),
-                Math.floor(height * 0.40),
-                Math.floor(height * 0.45),
-                Math.floor(height * 0.50),
-                Math.floor(height * 0.55),
-                Math.floor(height * 0.60),
-                Math.floor(height * 0.65)
-            ];
-
-            let totalScore = 0;
-            let stripesDetected = 0;
+            let detectionCount = 0;
+            let highScoreCount = 0;
+            let maxScore = 0;
 
             for (const y of stripSamples) {
-                // Get bar pattern from this line
-                const barWidths = [];
-                let inBar = false;
-                let barWidth = 0;
-                let barTransitions = 0;
+                if (y < 0 || y >= height) continue;
 
-                // Adaptive threshold based on local contrast
-                const threshold = (minBright + maxBright) / 2;
+                // Try multiple thresholds per line to find bar pattern
+                let bestScore = 0;
+                
+                for (let thresholdVal of [50, 100, 150, 180, 200]) {
+                    // Get bar pattern from this line at this threshold
+                    const barWidths = [];
+                    let inBar = false;
+                    let barWidth = 0;
 
-                for (let x = 0; x < width; x++) {
-                    const isDark = gray[y * width + x] < threshold;
+                    for (let x = 0; x < width; x++) {
+                        const isDark = gray[y * width + x] < thresholdVal;
 
-                    if (isDark && !inBar) {
-                        inBar = true;
-                        barWidth = 1;
-                    } else if (!isDark && inBar) {
-                        barWidths.push(barWidth);
-                        barTransitions++;
-                        inBar = false;
-                        barWidth = 0;
-                    } else if (inBar) {
-                        barWidth++;
+                        if (isDark && !inBar) {
+                            inBar = true;
+                            barWidth = 1;
+                        } else if (!isDark && inBar) {
+                            barWidths.push(barWidth);
+                            inBar = false;
+                            barWidth = 0;
+                        } else if (inBar) {
+                            barWidth++;
+                        }
+                    }
+                    if (inBar) barWidths.push(barWidth);
+
+                    // Score this pattern
+                    if (barWidths.length >= 15) {  // Lower threshold, less strict
+                        const mean = barWidths.reduce((a, b) => a + b) / barWidths.length;
+                        const variance = barWidths.reduce((sum, w) => sum + Math.pow(w - mean, 2), 0) / barWidths.length;
+                        const stdDev = Math.sqrt(variance);
+
+                        // Much more lenient scoring
+                        const hasVariation = stdDev > 0.5;  // Any variation counts
+                        const hasGoodLength = barWidths.length >= 15 && barWidths.length <= 200;  // Very lenient length
+                        
+                        // Simple: if it has variation AND good length, it's probably a barcode
+                        const lineScore = (hasVariation && hasGoodLength) ? 1.0 : 0.3;
+                        
+                        if (lineScore > bestScore) {
+                            bestScore = lineScore;
+                        }
                     }
                 }
-                if (inBar) barWidths.push(barWidth);
 
-                // Score this line
-                if (barWidths.length >= 20) {
-                    const mean = barWidths.reduce((a, b) => a + b) / barWidths.length;
-                    const variance = barWidths.reduce((sum, w) => sum + Math.pow(w - mean, 2), 0) / barWidths.length;
-                    const stdDev = Math.sqrt(variance);
-
-                    // Score factors:
-                    // 1. Variation in bar widths (barcodes have thin and thick bars)
-                    const variationScore = Math.min(stdDev / 3, 1.0); // Lowered threshold
-                    
-                    // 2. Number of bars (characteristic of 1D codes)
-                    const lengthScore = barWidths.length > 30 && barWidths.length < 120 ? 1.0 : 0;
-                    
-                    // 3. Number of transitions (more = more barcode-like)
-                    const transitionScore = Math.min(barTransitions / 80, 1.0);
-
-                    const lineScore = (variationScore * 0.4 + lengthScore * 0.4 + transitionScore * 0.2);
-                    
-                    if (lineScore > 0.3) {
-                        totalScore += lineScore;
-                        stripesDetected++;
+                // Any line with decent score counts
+                if (bestScore > 0.4) {
+                    detectionCount++;
+                    if (bestScore > 0.7) {
+                        highScoreCount++;
                     }
+                    maxScore = Math.max(maxScore, bestScore);
                 }
             }
 
-            const avgScore = stripesDetected > 0 ? totalScore / stripSamples.length : 0;
+            // MUCH more lenient detection - any hint of barcode triggers
+            const detected = detectionCount >= 2 || highScoreCount >= 1 || maxScore > 0.8;
 
-            // Much more lenient detection criteria
-            const detected = (
-                (avgScore > 0.25 && stripesDetected >= 3) ||  // Multiple strong lines
-                (avgScore > 0.35 && stripesDetected >= 2) ||  // Two very strong lines
-                (contrast > 50 && stripesDetected >= 4)       // Good contrast + many lines
-            );
+            // Log what we found for debugging
+            const avgScore = maxScore;
 
             return {
                 detected,
                 score: avgScore,
-                stripesDetected,
-                contrast
+                stripesDetected: detectionCount,
+                contrast: highScoreCount
             };
         }
 
