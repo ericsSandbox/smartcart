@@ -1098,7 +1098,9 @@
             let detectionActive = true;
             let lastDetectionTime = 0;
             let frameCount = 0;
-            const detectionCooldown = 1000; // 1 second between captures
+            let consecutiveDetections = 0;
+            const detectionThreshold = 3; // Require 3 consecutive frames
+            const detectionCooldown = 2000; // 2 seconds between captures
 
             addDebugLog(`📸 Detection started (${canvas.width}x${canvas.height})`);
 
@@ -1117,18 +1119,27 @@
                     // Detect barcode pattern
                     const result = detectBarcodePattern(imageData, canvas.width, canvas.height);
 
-                    if (frameCount % 30 === 0) {
-                        addDebugLog(`Frame ${frameCount}: Score=${result.score.toFixed(2)}, Stripes=${result.stripesDetected}, Detected=${result.detected}`);
+                    if (frameCount % 60 === 0) {
+                        addDebugLog(`Frame ${frameCount}: Score=${result.score.toFixed(2)}, Bars=${result.contrast}, Stripes=${result.stripesDetected}`);
                     }
 
                     if (result.detected) {
-                        const now = Date.now();
-                        if (now - lastDetectionTime > detectionCooldown) {
-                            addDebugLog('✅ PATTERN DETECTED! Capturing...');
-                            detectionActive = false;
-                            captureAndSearchBarcode(canvas, videoElement);
-                            lastDetectionTime = now;
+                        consecutiveDetections++;
+                        
+                        // Only trigger after 3 consecutive confirmed frames
+                        if (consecutiveDetections >= detectionThreshold) {
+                            const now = Date.now();
+                            if (now - lastDetectionTime > detectionCooldown) {
+                                addDebugLog(`✅ CONFIRMED! ${consecutiveDetections} frames, ${result.contrast} bars`);
+                                detectionActive = false;
+                                captureAndSearchBarcode(canvas, videoElement);
+                                lastDetectionTime = now;
+                                consecutiveDetections = 0;
+                            }
                         }
+                    } else {
+                        // Reset consecutive count if not detected
+                        consecutiveDetections = 0;
                     }
 
                 } catch (err) {
@@ -1154,23 +1165,25 @@
                 gray[i / 4] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
             }
 
-            // Sample more lines - scan the middle 40% of image vertically
+            // Sample lines in middle section
             const stripSamples = [];
-            for (let i = 0; i < 15; i++) {
-                stripSamples.push(Math.floor(height * (0.3 + (i * 0.04))));
+            for (let i = 0; i < 10; i++) {
+                stripSamples.push(Math.floor(height * (0.35 + (i * 0.03))));
             }
 
             let detectionCount = 0;
             let highScoreCount = 0;
             let maxScore = 0;
+            let maxBars = 0;
 
             for (const y of stripSamples) {
                 if (y < 0 || y >= height) continue;
 
-                // Try multiple thresholds per line to find bar pattern
+                // Try multiple thresholds per line
                 let bestScore = 0;
+                let bestBars = 0;
                 
-                for (let thresholdVal of [50, 100, 150, 180, 200]) {
+                for (let thresholdVal of [80, 120, 160, 200]) {
                     // Get bar pattern from this line at this threshold
                     const barWidths = [];
                     let inBar = false;
@@ -1192,28 +1205,29 @@
                     }
                     if (inBar) barWidths.push(barWidth);
 
-                    // Score this pattern
-                    if (barWidths.length >= 15) {  // Lower threshold, less strict
+                    // REAL barcode criteria: 30-120 bars minimum
+                    // EAN-13: ~95, UPC: ~95, CODE-128: ~67
+                    if (barWidths.length >= 30 && barWidths.length <= 120) {
                         const mean = barWidths.reduce((a, b) => a + b) / barWidths.length;
                         const variance = barWidths.reduce((sum, w) => sum + Math.pow(w - mean, 2), 0) / barWidths.length;
                         const stdDev = Math.sqrt(variance);
 
-                        // Much more lenient scoring
-                        const hasVariation = stdDev > 0.5;  // Any variation counts
-                        const hasGoodLength = barWidths.length >= 15 && barWidths.length <= 200;  // Very lenient length
-                        
-                        // Simple: if it has variation AND good length, it's probably a barcode
-                        const lineScore = (hasVariation && hasGoodLength) ? 1.0 : 0.3;
-                        
-                        if (lineScore > bestScore) {
-                            bestScore = lineScore;
+                        // Barcodes have variation between thin and thick bars
+                        if (stdDev > 1.0) {
+                            const lineScore = Math.min(stdDev / 5, 1.0);
+                            
+                            if (lineScore > bestScore) {
+                                bestScore = lineScore;
+                                bestBars = barWidths.length;
+                            }
                         }
                     }
                 }
 
-                // Any line with decent score counts
-                if (bestScore > 0.4) {
+                // Only count strong detections
+                if (bestScore > 0.5 && bestBars >= 30) {
                     detectionCount++;
+                    maxBars = Math.max(maxBars, bestBars);
                     if (bestScore > 0.7) {
                         highScoreCount++;
                     }
@@ -1221,17 +1235,14 @@
                 }
             }
 
-            // MUCH more lenient detection - any hint of barcode triggers
-            const detected = detectionCount >= 2 || highScoreCount >= 1 || maxScore > 0.8;
-
-            // Log what we found for debugging
-            const avgScore = maxScore;
+            // STRICT detection - requires 2+ strong lines AND 30+ bars
+            const detected = (detectionCount >= 2 && maxBars >= 30);
 
             return {
                 detected,
-                score: avgScore,
+                score: maxScore,
                 stripesDetected: detectionCount,
-                contrast: highScoreCount
+                contrast: maxBars
             };
         }
 
