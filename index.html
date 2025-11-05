@@ -789,6 +789,21 @@
         </div>
     </div>
 
+    <div class="modal" id="debugLogModal">
+        <div class="modal-content" style="width: 90%; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>🔍 Scan Debug Log</span>
+                <button type="button" class="close" onclick="document.getElementById('debugLogModal').classList.remove('active')" style="font-size: 20px; cursor: pointer; background: none; border: none; color: #666;">✕</button>
+            </div>
+            <div id="debugLogViewer" style="flex: 1; overflow-y: auto; background: #1a1a1a; color: #0f0; font-family: monospace; font-size: 12px; padding: 15px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; margin-bottom: 15px;"></div>
+            <div class="button-group" style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-primary" onclick="copyDebugLogFromModal()" style="flex: 1;">📋 Copy Log</button>
+                <button type="button" class="btn btn-secondary" onclick="clearDebugLog(); document.getElementById('debugLogViewer').textContent = ''; addDebugLog('Log cleared')" style="flex: 1;">🗑️ Clear</button>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('debugLogModal').classList.remove('active')" style="flex: 1;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const PANTRY_KEY = 'smartcart_pantry';
         const SHOPPING_KEY = 'smartcart_shopping';
@@ -960,6 +975,16 @@
         
         function copyDebugLog() {
             const logText = debugLog.join('\n');
+            navigator.clipboard.writeText(logText).then(() => {
+                alert('📋 Debug log copied to clipboard!');
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                alert('❌ Could not copy log');
+            });
+        }
+        
+        function copyDebugLogFromModal() {
+            const logText = document.getElementById('debugLogViewer').textContent;
             navigator.clipboard.writeText(logText).then(() => {
                 alert('📋 Debug log copied to clipboard!');
             }).catch(err => {
@@ -1466,6 +1491,13 @@
             document.getElementById('scanStatus').textContent = '📷 Ready...';
             document.getElementById('scanStatus').classList.remove('success');
             document.getElementById('cameraContainer').classList.remove('active');
+            
+            // Show persistent debug log modal if there are logs
+            const debugLogContent = document.getElementById('debugLog')?.textContent || '';
+            if (debugLogContent.trim()) {
+                document.getElementById('debugLogViewer').textContent = debugLogContent;
+                document.getElementById('debugLogModal').classList.add('active');
+            }
         }
 
         // Handle page visibility for camera lifecycle
