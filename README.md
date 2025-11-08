@@ -1,155 +1,185 @@
 # SmartCart
 
-A smart grocery planning and budget management application that helps households manage their shopping lists, pantry inventory, and grocery budgets efficiently.
+A smart grocery planning and budget management application that helps households manage their shopping lists, pantry inventory, and track household members. Designed for iOS/Safari with full mobile optimization.
+
+🔗 **Live Demo**: https://ericsSandbox.github.io/smartcart/
 
 ## Features
 
 - 🏠 **Household Management**
-  - Create and manage household profiles
-  - Add multiple household members
-  - Set monthly grocery budgets
+  - Add and manage household members
+  - Track allergies and dietary preferences
+  - View member profiles
 
 - 📝 **Shopping Lists**
-  - Create multiple shopping lists
-  - Add items with quantities and units
-  - Share lists between household members
-  - Track shopping progress
+  - Create shopping lists with items
+  - Mark items as completed
+  - Real-time search and filtering
+  - Persistent data storage
 
 - 🥫 **Pantry Inventory**
   - Track items in your pantry
-  - Monitor expiry dates
-  - Get low stock alerts
-  - Auto-update when shopping is completed
+  - Monitor expiry dates with visual alerts
+  - Get low stock warnings
+  - Search and filter inventory
+  - Adjust quantities easily
+
+- 📱 **Barcode Scanner** (Beta)
+  - Real-time barcode detection using device camera
+  - Automatic product lookup from Open Food Facts database
+  - Manual entry fallback for unrecognized barcodes
+  - Debug logging for troubleshooting
 
 ## Tech Stack
 
-### Backend
+### Frontend (Deployed to GitHub Pages)
+- HTML5 + CSS3 + Vanilla JavaScript (No frameworks)
+- Canvas API for barcode detection
+- MediaDevices API for camera access
+- localStorage for persistent data
+- jsQR + Tesseract.js for barcode decoding
+- Responsive design optimized for iOS Safari
+
+### Backend (Optional)
 - FastAPI (Python 3.12)
 - PostgreSQL 15
-- SQLAlchemy ORM
-- Pydantic for data validation
-
-### Frontend
-- React 19
-- Vite
-- Tailwind CSS
-- Axios for API communication
-
-### Infrastructure
-- Docker + Docker Compose
-- GitHub Actions (coming soon)
+- Docker + Docker Compose (not currently deployed)
 
 ## Prerequisites
 
-- Docker and Docker Compose
-- Node.js 20+ (for local frontend development)
-- Python 3.12+ (for local backend development)
+- **To Use**: Modern mobile browser (iOS Safari, Android Chrome) or desktop browser
+- **To Develop Locally**: Node.js 20+ (for frontend) or Python 3.12+ (for backend)
 
-## Quick Start
+## Quick Start - Using the Live App
+
+Simply visit **https://ericsSandbox.github.io/smartcart/** on any device with a modern browser. Your data is stored locally on your device using browser localStorage.
+
+### Supported Browsers
+- ✅ iOS Safari (primary target)
+- ✅ Chrome/Chromium on desktop and Android
+- ✅ Firefox on desktop
+- ✅ Any modern browser with localStorage support
+
+## Installation for Local Development
+
+### GitHub Pages Deployment (Automatic)
+
+The application automatically deploys to GitHub Pages on every push to `main`. To set up:
+
+1. Fork or clone this repository
+2. Enable GitHub Pages in repository settings:
+   - Go to Settings → Pages
+   - Source: Deploy from a branch
+   - Branch: main
+   - Folder: / (root)
+3. Your app will be live at `https://<your-username>.github.io/smartcart/`
+
+The deployment is fully automated via `.github/workflows/deploy.yml`.
+
+### Running Locally
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/ericsSandbox/smartcart.git
    cd SmartCart
    ```
 
-2. Start the application:
+2. Simply open `index.html` in your browser:
+   ```bash
+   # Linux/macOS
+   open index.html
+   
+   # Or with Python's simple server
+   python -m http.server 8000
+   # Then visit http://localhost:8000
+   ```
+
+3. Or use Docker Compose (if running the full stack):
    ```bash
    docker-compose up -d
    ```
-
-3. Access the applications:
    - Frontend: http://localhost:5173
    - Backend API: http://localhost:8000
-   - API Documentation: http://localhost:8000/docs
 
-## Development Setup
+## Usage Guide
 
-### Backend (Local)
+### Pantry Tab
+- **Add Items**: Click "+" button to add items manually or use barcode scanner
+- **View Items**: All pantry items displayed with quantity, unit, and expiry status
+- **Manage Stock**: Use +/- buttons to adjust quantities
+- **Expiry Alerts**: Red background indicates expired items, yellow indicates expiring soon
+- **Search**: Use search box to filter items by name
 
-1. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Linux/macOS
-   # or
-   .\venv\Scripts\activate  # Windows
-   ```
+### Shopping List Tab
+- **Create Lists**: Add shopping list items
+- **Mark Complete**: Click checkbox to mark items as done (strikethrough)
+- **Search**: Filter shopping items by name
 
-2. Install dependencies:
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   ```
+### Members Tab
+- **Add Members**: Click "+" to add household members
+- **Track Info**: Record age, allergies, and dietary preferences
+- **View Profiles**: See all member information in one place
 
-3. Run the development server:
-   ```bash
-   uvicorn app.main:app --reload
-   ```
+### Barcode Scanner Tab (Beta)
+- **Select Camera**: Choose which camera to use (front/rear)
+- **Scan**: Point camera at barcode
+- **Auto-Lookup**: Automatically looks up product info from Open Food Facts
+- **Manual Entry**: If barcode not found in database, manually enter product name
+- **Debug**: View real-time detection logs for troubleshooting
 
-### Frontend (Local)
+### Settings Tab
+- **Clear Data**: Delete all stored data (pantry, shopping lists, members)
+- **Export Data**: View stored data as JSON for backup
+- **Storage Info**: See how much data is stored locally
 
-1. Install dependencies:
-   ```bash
-   cd frontend
-   npm install
-   ```
+## Data Storage
 
-2. Start the development server:
-   ```bash
-   npm run dev
-   ```
+All data is stored locally in your browser's localStorage. This means:
+- ✅ No data sent to any server (privacy-friendly)
+- ✅ Data persists between sessions
+- ❌ Data is device-specific (not synced across devices)
+- ❌ Clearing browser data will delete your items
+
+**Backup Recommendation**: Periodically export your data from Settings tab
 
 ## Project Structure
 
 ```
 SmartCart/
-├── backend/
+├── index.html               # Main application (single-file app)
+├── .github/
+│   └── workflows/
+│       └── deploy.yml       # GitHub Pages deployment
+├── .nojekyll                # GitHub Pages configuration
+├── backend/                 # Optional Python backend
 │   ├── app/
-│   │   ├── crud.py          # Database operations
-│   │   ├── main.py          # FastAPI application
-│   │   ├── models.py        # SQLAlchemy models
-│   │   └── schemas.py       # Pydantic schemas
-│   ├── Dockerfile
+│   │   ├── crud.py         # Database operations
+│   │   ├── main.py         # FastAPI application
+│   │   ├── models.py       # SQLAlchemy models
+│   │   └── schemas.py      # Pydantic schemas
 │   └── requirements.txt
-├── frontend/
+├── frontend/                # Optional React frontend
 │   ├── src/
-│   │   ├── components/      # React components
-│   │   ├── services/        # API services
-│   │   └── App.jsx         
-│   ├── Dockerfile
-│   └── package.json
+│   ├── package.json
+│   └── README.md
 ├── docker-compose.yml
 └── README.md
 ```
 
-## Environment Variables
+## Known Issues & Limitations
 
-### Backend
-- `DATABASE_URL`: PostgreSQL connection string
-- `DB_HOST`: Database hostname
-- `POSTGRES_USER`: Database user
-- `POSTGRES_PASSWORD`: Database password
-- `POSTGRES_DB`: Database name
+### Barcode Scanner (Beta)
+- **Detection**: Works well with clear, standard barcodes
+- **Decoding**: Currently uses manual entry as primary method (jsQR/Tesseract not fully reliable)
+- **Recommendation**: Use manual entry for consistent results
+- **Debug**: Check scanner logs if detection isn't working
 
-### Frontend
-- Environment variables are built into the application at build time
+### Data Limitations
+- ❌ No multi-device sync (data is device-specific)
+- ❌ No cloud backup (export manually from Settings)
+- ❌ No sharing with other users (planned feature)
 
-## API Documentation
-
-The API documentation is available at http://localhost:8000/docs when running the application. It includes:
-- All available endpoints
-- Request/response schemas
-- Authentication requirements (coming soon)
-- Interactive testing interface
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-[MIT License](LICENSE)
+### Browser Limitations
+- Requires modern browser with localStorage support
+- iOS Safari: May need permission to access camera for barcode scanner
+- Private/Incognito mode: Data may not persist (depends on browser settings)
