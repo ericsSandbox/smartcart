@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -26,15 +30,23 @@ jobs:
       - name: Create deployment directory
         run: |
           mkdir -p _site
+          echo "📋 Copying files to _site..."
           cp index.html _site/
           cp .nojekyll _site/ || true
           cp -r public/* _site/ 2>/dev/null || true
           cp -r data _site/ 2>/dev/null || true
           cp -r docs/* _site/ 2>/dev/null || true
-          # Copy all markdown documentation files
           cp *.md _site/ 2>/dev/null || true
+          echo "✅ Setup complete"
           echo "📁 Contents of _site:"
-          ls -lah _site/
+          ls -lah _site/ | head -20
+
+      - name: Verify artifact contents
+        run: |
+          echo "Checking critical files..."
+          [ -f _site/index.html ] && echo "✅ index.html found" || echo "❌ index.html missing"
+          [ -f _site/.nojekyll ] && echo "✅ .nojekyll found" || echo "❌ .nojekyll missing"
+          echo "Total files in _site: $(find _site -type f | wc -l)"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -44,10 +56,14 @@ jobs:
           if-no-files-found: error
 
       - name: Wait for artifact processing
-        run: sleep 5
+        run: |
+          echo "⏳ Waiting for artifact to be processed..."
+          sleep 10
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
-        timeout-minutes: 10
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
 
