@@ -23,18 +23,22 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: Create deployment
+      - name: Create deployment directory
         run: |
           mkdir -p _site
           cp index.html _site/
+          cp .nojekyll _site/ || true
           cp -r public/* _site/ 2>/dev/null || true
-          echo "Deployment prepared"
+          cp -r data _site/ 2>/dev/null || true
+          ls -la _site/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: '_site'
+          retention-days: 1
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
+        timeout-minutes: 5
