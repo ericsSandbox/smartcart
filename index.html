@@ -878,6 +878,159 @@
     </style>
 
     <script>
+        // ============================================
+        // API SERVICE LAYER - Backend Communication
+        // ============================================
+        
+        // Configuration
+        const API_BASE_URL = 'http://localhost:8000';
+        let householdId = null;
+        let useBackend = true;
+        
+        // Initialize API - check if backend is available
+        async function initAPI() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/init`);
+                if (response.ok) {
+                    const data = await response.json();
+                    householdId = data.household_id;
+                    console.log('✅ Backend connected. Household ID:', householdId);
+                    useBackend = true;
+                    return true;
+                }
+            } catch (error) {
+                console.warn('⚠️ Backend unavailable, using localStorage only');
+                useBackend = false;
+            }
+            return false;
+        }
+
+        // API Helper - Fetch with error handling
+        async function apiCall(method, endpoint, data = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                if (data) options.body = JSON.stringify(data);
+                
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                if (!response.ok) throw new Error(`API ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error('API call failed:', error);
+                throw error;
+            }
+        }
+
+        // ============================================
+        // PANTRY API CALLS
+        // ============================================
+        
+        async function fetchPantryFromAPI() {
+            if (!useBackend || !householdId) return null;
+            try {
+                const items = await apiCall('GET', `/households/${householdId}/pantry`);
+                console.log('📦 Pantry loaded from backend:', items.length, 'items');
+                return items;
+            } catch (error) {
+                console.error('Pantry fetch failed:', error);
+                return null;
+            }
+        }
+
+        async function createPantryItemAPI(item) {
+            if (!useBackend || !householdId) return null;
+            try {
+                return await apiCall('POST', `/households/${householdId}/pantry`, {
+                    name: item.name,
+                    quantity: item.quantity,
+                    unit: item.unit,
+                    expires_at: item.expires_at
+                });
+            } catch (error) { return null; }
+        }
+
+        async function updatePantryItemAPI(itemId, updates) {
+            if (!useBackend || !householdId) return null;
+            try {
+                return await apiCall('PATCH', `/households/${householdId}/pantry/${itemId}`, updates);
+            } catch (error) { return null; }
+        }
+
+        async function deletePantryItemAPI(itemId) {
+            if (!useBackend || !householdId) return false;
+            try {
+                await apiCall('DELETE', `/households/${householdId}/pantry/${itemId}`);
+                return true;
+            } catch (error) { return false; }
+        }
+
+        // ============================================
+        // SHOPPING LIST API CALLS
+        // ============================================
+        
+        async function fetchShoppingListsFromAPI() {
+            if (!useBackend || !householdId) return null;
+            try {
+                const lists = await apiCall('GET', `/households/${householdId}/lists`);
+                console.log('📝 Shopping lists loaded from backend:', lists.length, 'lists');
+                return lists;
+            } catch (error) { return null; }
+        }
+
+        async function createShoppingListAPI(listData) {
+            if (!useBackend || !householdId) return null;
+            try {
+                return await apiCall('POST', `/households/${householdId}/lists`, { name: listData.name });
+            } catch (error) { return null; }
+        }
+
+        async function deleteShoppingListAPI(listId) {
+            if (!useBackend || !householdId) return false;
+            try {
+                await apiCall('DELETE', `/households/${householdId}/lists/${listId}`);
+                return true;
+            } catch (error) { return false; }
+        }
+
+        // ============================================
+        // MEMBERS API CALLS
+        // ============================================
+        
+        async function fetchMembersFromAPI() {
+            if (!useBackend || !householdId) return null;
+            try {
+                const membersList = await apiCall('GET', `/households/${householdId}/members`);
+                console.log('👥 Members loaded from backend:', membersList.length, 'members');
+                return membersList;
+            } catch (error) { return null; }
+        }
+
+        async function createMemberAPI(member) {
+            if (!useBackend || !householdId) return null;
+            try {
+                return await apiCall('POST', `/households/${householdId}/members`, {
+                    name: member.name,
+                    age: member.age,
+                    allergies: member.allergies,
+                    dietary_pref: member.dietary_pref
+                });
+            } catch (error) { return null; }
+        }
+
+        async function deleteMemberAPI(memberId) {
+            if (!useBackend || !householdId) return false;
+            try {
+                await apiCall('DELETE', `/households/${householdId}/members/${memberId}`);
+                return true;
+            } catch (error) { return false; }
+        }
+
+        // ============================================
+        // LOCAL STORAGE LAYER - Fallback & Cache
+        // ============================================
+
         const PANTRY_KEY = 'smartcart_pantry';
         const SHOPPING_KEY = 'smartcart_shopping';
         const MEMBERS_KEY = 'smartcart_members';
@@ -888,23 +1041,52 @@
         let scannerActive = false;
         let lastDetectedBarcode = null;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            loadData();
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize backend connection
+            await initAPI();
+            
+            // Load data (from backend if available, else localStorage)
+            await loadData();
             setupEventListeners();
             renderUI();
             initScanner(); // Initialize barcode scanner
         });
 
-        function loadData() {
-            pantryItems = JSON.parse(localStorage.getItem(PANTRY_KEY) || '[]');
-            shoppingLists = JSON.parse(localStorage.getItem(SHOPPING_KEY) || '[]');
-            members = JSON.parse(localStorage.getItem(MEMBERS_KEY) || '[]');
+        async function loadData() {
+            // Try to load from backend first
+            if (useBackend && householdId) {
+                const pantryFromAPI = await fetchPantryFromAPI();
+                const shoppingFromAPI = await fetchShoppingListsFromAPI();
+                const membersFromAPI = await fetchMembersFromAPI();
+                
+                if (pantryFromAPI) pantryItems = pantryFromAPI;
+                if (shoppingFromAPI) shoppingLists = shoppingFromAPI;
+                if (membersFromAPI) members = membersFromAPI;
+                
+                // Cache to localStorage
+                localStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
+                localStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
+                localStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
+            } else {
+                // Fallback to localStorage only
+                pantryItems = JSON.parse(localStorage.getItem(PANTRY_KEY) || '[]');
+                shoppingLists = JSON.parse(localStorage.getItem(SHOPPING_KEY) || '[]');
+                members = JSON.parse(localStorage.getItem(MEMBERS_KEY) || '[]');
+                console.log('Using localStorage (backend unavailable)');
+            }
         }
 
-        function saveData() {
+        async function saveData() {
+            // Always save to localStorage (cache)
             localStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
             localStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
             localStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
+            
+            // Also sync to backend if available
+            if (useBackend && householdId) {
+                // Backend sync happens in individual create/update/delete functions
+                console.log('Data cached. Backend sync in progress...');
+            }
         }
 
         function setupEventListeners() {
@@ -1720,51 +1902,90 @@
             document.getElementById('barcodeInput').value = '';
         };
 
-        function addManualItem() {
+        async function addManualItem() {
             const name = document.getElementById('itemName').value;
             if (!name) {
                 alert('Please enter an item name');
                 return;
             }
             const item = {
-                id: Date.now(),
                 name: name,
                 quantity: parseFloat(document.getElementById('itemQty').value || 1),
                 unit: document.getElementById('itemUnit').value,
                 expires_at: document.getElementById('itemExpires').value || null
             };
-            pantryItems.push(item);
+            
+            // Try to create in backend first
+            if (useBackend && householdId) {
+                const apiItem = await createPantryItemAPI(item);
+                if (apiItem) {
+                    pantryItems.push(apiItem);
+                    console.log('✅ Item created in backend');
+                } else {
+                    // Fallback to local
+                    item.id = Date.now();
+                    pantryItems.push(item);
+                    console.log('⚠️ Created locally (backend sync failed)');
+                }
+            } else {
+                item.id = Date.now();
+                pantryItems.push(item);
+            }
+            
             saveData();
             renderUI();
             document.getElementById('addModal').classList.remove('active');
             document.getElementById('addForm').reset();
         }
 
-        function addMember() {
+        async function addMember() {
             const member = {
-                id: Date.now(),
                 name: document.getElementById('memberName').value,
                 age: document.getElementById('memberAge').value || null,
                 allergies: document.getElementById('memberAllergies').value || null,
                 dietary_pref: document.getElementById('memberDiet').value || null
             };
-            members.push(member);
+            
+            // Try to create in backend first
+            if (useBackend && householdId) {
+                const apiMember = await createMemberAPI(member);
+                if (apiMember) {
+                    members.push(apiMember);
+                    console.log('✅ Member created in backend');
+                } else {
+                    member.id = Date.now();
+                    members.push(member);
+                    console.log('⚠️ Created locally (backend sync failed)');
+                }
+            } else {
+                member.id = Date.now();
+                members.push(member);
+            }
+            
             saveData();
             renderUI();
             document.getElementById('addMemberForm').reset();
             document.getElementById('addMemberModal').classList.remove('active');
         }
 
-        function deletePantryItem(id) {
+        async function deletePantryItem(id) {
             if (confirm('Delete this item?')) {
+                // Try to delete from backend first
+                if (useBackend && householdId) {
+                    await deletePantryItemAPI(id);
+                }
                 pantryItems = pantryItems.filter(i => i.id !== id);
                 saveData();
                 renderUI();
             }
         }
 
-        function deleteMember(id) {
+        async function deleteMember(id) {
             if (confirm('Delete this member?')) {
+                // Try to delete from backend first
+                if (useBackend && householdId) {
+                    await deleteMemberAPI(id);
+                }
                 members = members.filter(m => m.id !== id);
                 saveData();
                 renderUI();
@@ -1951,7 +2172,7 @@
             }
         }
 
-        function createNewShoppingList() {
+        async function createNewShoppingList() {
             const name = document.getElementById('shoppingListName').value.trim();
             if (!name) {
                 alert('Please enter a list name');
@@ -1959,11 +2180,25 @@
             }
             
             const newList = {
-                id: Date.now(),
                 name: name,
                 items: [],
                 createdAt: new Date().toISOString()
             };
+            
+            // Try to create in backend first
+            if (useBackend && householdId) {
+                const apiList = await createShoppingListAPI(newList);
+                if (apiList) {
+                    newList.id = apiList.id;
+                    newList.items = apiList.items || [];
+                    console.log('✅ List created in backend');
+                } else {
+                    newList.id = Date.now();
+                    console.log('⚠️ Created locally (backend sync failed)');
+                }
+            } else {
+                newList.id = Date.now();
+            }
             
             shoppingLists.push(newList);
             currentShoppingListId = newList.id;
@@ -2027,8 +2262,12 @@
             }
         }
 
-        function deleteShoppingList(listId) {
+        async function deleteShoppingList(listId) {
             if (confirm('Delete this shopping list?')) {
+                // Try to delete from backend first
+                if (useBackend && householdId) {
+                    await deleteShoppingListAPI(listId);
+                }
                 shoppingLists = shoppingLists.filter(l => l.id !== listId);
                 if (currentShoppingListId === listId) {
                     currentShoppingListId = null;
