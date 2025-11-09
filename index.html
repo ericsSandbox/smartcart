@@ -1148,7 +1148,12 @@
 
         function exportDataAsCSV() {
             const timestamp = new Date().toISOString().split('T')[0];
-            let csv = 'PANTRY INVENTORY EXPORT\n';
+            let csv = 'SMARTCART - PANTRY & SHOPPING DATA EXPORT\n';
+            csv += 'Exported: ' + new Date().toLocaleString() + '\n';
+            csv += '\n⚠️  NOTE: This CSV is for VIEWING only. To restore data after cache clear,\n';
+            csv += 'use the JSON BACKUP file (💾 Backup button) with the ⬆️ Restore button.\n';
+            csv += 'See HOW_TO_RESTORE.md for details.\n\n';
+            csv += 'PANTRY INVENTORY EXPORT\n';
             csv += 'Exported: ' + new Date().toLocaleString() + '\n\n';
             csv += 'Item Name,Quantity,Unit,Category,Is Staple,Date Added\n';
             
