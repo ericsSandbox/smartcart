@@ -2472,7 +2472,7 @@
                 grouped[cat].push(item);
             });
             
-            // Filter by search
+            // Filter by search - include items that match search term in name
             const filteredGrouped = {};
             Object.entries(grouped).forEach(([cat, items]) => {
                 const filtered = items.filter(i => i.name.toLowerCase().includes(search));
@@ -2524,13 +2524,22 @@
                         'Household': '🏠'
                     };
                     
+                    // Load collapse state from localStorage (default: expanded)
+                    const collapseKey = 'pantryCollapse_' + cat;
+                    const isCollapsed = localStorage.getItem(collapseKey) === 'true';
+                    
                     return `
                         <div class="category-section">
-                            <div class="category-header">
-                                <span>${categoryEmojis[cat] || '📂'} ${cat}</span>
+                            <div class="category-header" onclick="window.toggleCategoryCollapse('${cat}')" style="cursor: pointer; user-select: none;">
+                                <span style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                                    <span style="display: inline-block; width: 12px; text-align: center;">
+                                        ${isCollapsed ? '▶' : '▼'}
+                                    </span>
+                                    <span>${categoryEmojis[cat] || '📂'} ${cat}</span>
+                                </span>
                                 <span class="category-count">${items.length}</span>
                             </div>
-                            <div class="category-items">
+                            <div class="category-items" id="category-${cat.replace(/\s+/g, '-')}" style="display: ${isCollapsed ? 'none' : 'flex'}; ${isCollapsed ? 'overflow: hidden;' : ''}">
                                 ${items.map(item => {
                                     const expired = isExpired(item.expires_at);
                                     const expiresIn = getExpiresIn(item.expires_at);
@@ -2568,6 +2577,28 @@
                 document.getElementById('itemList').innerHTML = html;
             }
         }
+
+        window.toggleCategoryCollapse = function(category) {
+            const collapseKey = 'pantryCollapse_' + category;
+            const isCollapsed = localStorage.getItem(collapseKey) === 'true';
+            const newState = !isCollapsed;
+            localStorage.setItem(collapseKey, newState);
+            
+            // Update the display
+            const categoryId = 'category-' + category.replace(/\s+/g, '-');
+            const categoryItems = document.getElementById(categoryId);
+            if (categoryItems) {
+                categoryItems.style.display = newState ? 'none' : 'flex';
+                // Update arrow
+                const header = categoryItems.previousElementSibling;
+                if (header) {
+                    const arrow = header.querySelector('[style*="display: inline-block"]');
+                    if (arrow) {
+                        arrow.textContent = newState ? '▶' : '▼';
+                    }
+                }
+            }
+        };
 
         function renderUI() {
             // Check if we should show categorized view
@@ -2995,6 +3026,9 @@
 
             saveData();
             renderUI();
+            
+            // Auto-select the shopping list and display it
+            selectShoppingList(currentShoppingListId);
             renderShoppingListDetails();
             document.getElementById('ingredientPasteArea').value = '';
 
@@ -3018,6 +3052,33 @@
         function extractBaseIngredient(ingredientName) {
             if (!ingredientName) return '';
             
+            // Common multi-word ingredients that should NOT have descriptors removed
+            const compoundIngredients = [
+                'soy sauce', 'worcestershire sauce', 'hot sauce', 'apple sauce',
+                'fish sauce', 'oyster sauce', 'teriyaki sauce', 'bbq sauce',
+                'sweet chili sauce', 'sriracha sauce', 'tomato sauce', 'pizza sauce',
+                'barbecue sauce', 'balsamic reduction', 'ranch dressing', 'honey mustard',
+                'horseradish mustard', 'dijon mustard', 'yellow mustard',
+                'ground beef', 'ground turkey', 'ground pork', 'ground chicken',
+                'ground cumin', 'ground ginger', 'ground coriander',
+                'frozen peas', 'frozen vegetables', 'frozen pizza', 'frozen peas',
+                'cream cheese', 'whipped cream', 'sour cream',
+                'olive oil', 'vegetable oil', 'sesame oil', 'coconut oil', 'grape seed oil',
+                'apple cider vinegar', 'balsamic vinegar', 'rice vinegar', 'white vinegar',
+                'red wine vinegar', 'wine vinegar',
+                'parmesan cheese', 'cheddar cheese', 'mozzarella cheese', 'feta cheese',
+                'chicken breast', 'chicken thigh', 'turkey breast', 'pork loin'
+            ];
+            
+            let name = ingredientName.toLowerCase().trim();
+            
+            // Check if it's a known compound ingredient - return as-is
+            for (const compound of compoundIngredients) {
+                if (name.includes(compound)) {
+                    return compound;
+                }
+            }
+            
             // Common descriptors to remove
             const descriptors = [
                 'ground', 'sliced', 'diced', 'minced', 'shredded', 'grated', 'chopped',
@@ -3032,9 +3093,7 @@
                 'white', 'brown', 'al dente'
             ];
             
-            let name = ingredientName.toLowerCase().trim();
-            
-            // Remove descriptors from the end
+            // Remove descriptors from the words
             const words = name.split(/\s+/);
             let cleanedWords = [];
             
