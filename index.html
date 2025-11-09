@@ -251,6 +251,40 @@
             background: #fecaca;
         }
 
+        .category-section {
+            margin-bottom: 20px;
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-left: 4px solid #3b82f6;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-weight: 700;
+            font-size: 16px;
+            color: #0c4a6e;
+        }
+
+        .category-count {
+            background: #3b82f6;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .category-items {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-left: 4px;
+        }
+
         .add-item-btn {
             position: fixed;
             bottom: 20px;
@@ -673,6 +707,7 @@
             </div>
 
             <div style="display: flex; gap: 8px; padding: 12px; background: #f0f9ff; border-radius: 8px; margin: 12px 12px 0 12px; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="togglePantryView()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;" id="viewToggleBtn">📂 View: Categories</button>
                 <button class="btn btn-primary" onclick="showDataStats()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">📊 Stats</button>
                 <button class="btn btn-secondary" onclick="exportDataAsJSON()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">💾 Backup</button>
                 <button class="btn btn-secondary" onclick="exportDataAsCSV()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">📥 Export CSV</button>
@@ -1072,6 +1107,14 @@
             // Load data (from backend if available, else localStorage)
             await loadData();
             setupEventListeners();
+            
+            // Initialize pantry view mode
+            const viewMode = localStorage.getItem('pantryViewMode') || 'category';
+            const btn = document.getElementById('viewToggleBtn');
+            if (btn) {
+                btn.textContent = viewMode === 'category' ? '📂 View: Categories' : '📋 View: Items';
+            }
+            
             renderUI();
             initScanner(); // Initialize barcode scanner
         });
@@ -1363,7 +1406,12 @@
             });
 
             document.getElementById('searchInput').addEventListener('input', () => {
-                renderPantry();
+                const viewMode = localStorage.getItem('pantryViewMode') || 'category';
+                if (viewMode === 'category') {
+                    renderPantryByCategory();
+                } else {
+                    renderPantry();
+                }
             });
 
             document.getElementById('shoppingSearch').addEventListener('input', () => {
@@ -2076,14 +2124,27 @@
         };
 
         window.addScannedItem = function(name) {
-            const item = {
-                id: Date.now(),
-                name: name,
-                quantity: parseFloat(document.getElementById('scannedQty').value),
-                unit: document.getElementById('scannedUnit').value,
-                expires_at: document.getElementById('scannedExpires').value || null
-            };
-            pantryItems.push(item);
+            // Check for duplicate
+            const existing = findDuplicateItem(name);
+            
+            if (existing) {
+                // Add to existing item
+                const addQty = parseFloat(document.getElementById('scannedQty').value);
+                existing.quantity += addQty;
+                alert(`✅ Added ${addQty} unit(s) to existing "${existing.name}"\n\nNew total: ${existing.quantity} ${existing.unit}`);
+            } else {
+                // Create new item
+                const item = {
+                    id: Date.now(),
+                    name: name,
+                    quantity: parseFloat(document.getElementById('scannedQty').value),
+                    unit: document.getElementById('scannedUnit').value,
+                    expires_at: document.getElementById('scannedExpires').value || null
+                };
+                pantryItems.push(item);
+                alert(`➕ Created new entry: "${name}"`);
+            }
+            
             saveData();
             renderUI();
             document.getElementById('addModal').classList.remove('active');
@@ -2091,17 +2152,37 @@
             document.getElementById('barcodeInput').value = '';
         };
 
+        window.findDuplicateItem = function(itemName) {
+            if (!itemName) return null;
+            const nameLower = itemName.trim().toLowerCase();
+            return pantryItems.find(item => item.name.toLowerCase() === nameLower);
+        };
+
         window.addManualScanned = function() {
             const name = document.getElementById('manualName').value;
             if (!name) return;
-            const item = {
-                id: Date.now(),
-                name: name,
-                quantity: parseFloat(document.getElementById('manualQty').value || 1),
-                unit: document.getElementById('manualUnit').value,
-                expires_at: null
-            };
-            pantryItems.push(item);
+            
+            // Check for duplicate
+            const existing = findDuplicateItem(name);
+            
+            if (existing) {
+                // Add to existing item
+                const addQty = parseFloat(document.getElementById('manualQty').value || 1);
+                existing.quantity += addQty;
+                alert(`✅ Added ${addQty} unit(s) to existing "${existing.name}"\n\nNew total: ${existing.quantity} ${existing.unit}`);
+            } else {
+                // Create new item
+                const item = {
+                    id: Date.now(),
+                    name: name,
+                    quantity: parseFloat(document.getElementById('manualQty').value || 1),
+                    unit: document.getElementById('manualUnit').value,
+                    expires_at: null
+                };
+                pantryItems.push(item);
+                alert(`➕ Created new entry: "${name}"`);
+            }
+            
             saveData();
             renderUI();
             document.getElementById('addModal').classList.remove('active');
@@ -2115,28 +2196,42 @@
                 alert('Please enter an item name');
                 return;
             }
-            const item = {
-                name: name,
-                quantity: parseFloat(document.getElementById('itemQty').value || 1),
-                unit: document.getElementById('itemUnit').value,
-                expires_at: document.getElementById('itemExpires').value || null
-            };
             
-            // Try to create in backend first
-            if (useBackend && householdId) {
-                const apiItem = await createPantryItemAPI(item);
-                if (apiItem) {
-                    pantryItems.push(apiItem);
-                    console.log('✅ Item created in backend');
+            // Check for duplicate
+            const existing = findDuplicateItem(name);
+            
+            if (existing) {
+                // Add to existing item
+                const addQty = parseFloat(document.getElementById('itemQty').value || 1);
+                const oldQty = existing.quantity;
+                existing.quantity += addQty;
+                alert(`✅ Smart Duplicate Detection!\n\nAdded ${addQty} unit(s) to existing "${existing.name}"\n\nOld total: ${oldQty} ${existing.unit}\nNew total: ${existing.quantity} ${existing.unit}`);
+            } else {
+                // Create new item
+                const item = {
+                    name: name,
+                    quantity: parseFloat(document.getElementById('itemQty').value || 1),
+                    unit: document.getElementById('itemUnit').value,
+                    expires_at: document.getElementById('itemExpires').value || null
+                };
+                
+                // Try to create in backend first
+                if (useBackend && householdId) {
+                    const apiItem = await createPantryItemAPI(item);
+                    if (apiItem) {
+                        pantryItems.push(apiItem);
+                        console.log('✅ Item created in backend');
+                    } else {
+                        // Fallback to local
+                        item.id = Date.now();
+                        pantryItems.push(item);
+                        console.log('⚠️ Created locally (backend sync failed)');
+                    }
                 } else {
-                    // Fallback to local
                     item.id = Date.now();
                     pantryItems.push(item);
-                    console.log('⚠️ Created locally (backend sync failed)');
                 }
-            } else {
-                item.id = Date.now();
-                pantryItems.push(item);
+                alert(`➕ Created new entry: "${name}"`);
             }
             
             saveData();
@@ -2275,10 +2370,229 @@
             return null;
         }
 
+        // ==================== SMART CATEGORIZATION ====================
+        
+        const CATEGORY_PATTERNS = {
+            'Proteins': [
+                'chicken', 'beef', 'pork', 'turkey', 'bacon', 'ham', 'steak', 'fish', 
+                'salmon', 'tuna', 'shrimp', 'crab', 'lobster', 'breast', 'roast', 'chop',
+                'meatball', 'sausage', 'ground', 'stew meat'
+            ],
+            'Vegetables': [
+                'cucumber', 'onion', 'carrot', 'celery', 'lettuce', 'spinach', 'kale',
+                'broccoli', 'cauliflower', 'cabbage', 'peppers', 'squash', 'zucchini',
+                'tomato', 'corn', 'peas', 'beans', 'potato', 'leek', 'garlic', 'beet',
+                'asparagus', 'green beans', 'mushroom', 'avocado', 'lemon', 'lime'
+            ],
+            'Spices': [
+                'turmeric', 'ginger', 'cumin', 'paprika', 'cinnamon', 'nutmeg', 'clove',
+                'oregano', 'basil', 'thyme', 'rosemary', 'sage', 'bay', 'pepper', 'chili',
+                'cayenne', 'seasoning', 'spice', 'salt', 'allspice', 'coriander', 'cardamom',
+                'fennel', 'caraway', 'dill', 'parsley', 'garlic powder', 'onion powder',
+                'curry', 'garam masala', 'chinese 5', 'peruvian', 'saxon', 'tanjin',
+                'poultry', 'taco', 'italian', 'peppercorn', 'mustard seed', 'celery salt'
+            ],
+            'Condiments': [
+                'ketchup', 'mayo', 'mayonnaise', 'mustard', 'sriracha', 'hot sauce',
+                'sauce', 'dressing', 'ranch', 'vinaigrette', 'bbq', 'barbecue',
+                'worcestershire', 'soy sauce', 'teriyaki', 'sweet chili', 'tahini',
+                'peanut butter', 'horseradish', 'honey mustard', 'dijon', 'asian'
+            ],
+            'Oils & Vinegars': [
+                'oil', 'grape seed', 'vegetable', 'olive', 'sesame', 'coconut',
+                'vinegar', 'wine', 'apple cider', 'balsamic', 'rice', 'white', 'red'
+            ],
+            'Grains & Pasta': [
+                'rice', 'basmati', 'jasmine', 'white rice', 'pasta', 'spaghetti',
+                'noodle', 'egg noodles', 'penne', 'rigatoni', 'flour', 'wheat',
+                'barley', 'lentil', 'bean', 'garbanzo', 'crackers', 'breadcrumb',
+                'bread', 'bagel', 'pita'
+            ],
+            'Baking': [
+                'baking', 'yeast', 'sugar', 'syrup', 'honey', 'maple', 'corn syrup',
+                'cream of tartar', 'extract', 'vanilla', 'strawberry', 'mix', 'cake',
+                'flour', 'brown sugar', 'superfine', 'granulated', 'chocolate'
+            ],
+            'Frozen': [
+                'frozen', 'peas', 'pizza', 'pocket', 'hot pocket', 'lasagna',
+                'ice', 'freezer', 'dough', 'pattie'
+            ],
+            'Bakery': [
+                'bagel', 'bread', 'roll', 'croissant', 'pastry', 'wrapper', 'egg roll',
+                'pita', 'tortilla', 'bun', 'breadcrumb', 'nutrigrain', 'bar'
+            ],
+            'Dairy & Cheese': [
+                'milk', 'cheese', 'cream', 'yogurt', 'butter', 'whipped', 'sour',
+                'parmesan', 'provolone', 'cheddar', 'mozzarella', 'swiss', 'feta',
+                'ricotta', 'brie', 'gouda', 'egg', 'stick'
+            ],
+            'Pantry': [
+                'crackers', 'granola', 'cereal', 'soup', 'beans', 'canned', 'coconut water',
+                'vegetarian', 'baked beans', 'jam', 'jellied', 'grenadine', 'gravy'
+            ],
+            'Household': [
+                'ziplock', 'plastic', 'wrap', 'foil', 'aluminum', 'parchment', 'bag',
+                'paper', 'sandwich', 'gallon'
+            ]
+        };
+
+        function autoCategorizePantryItem(itemName) {
+            if (!itemName) return 'Pantry';
+            const nameLower = itemName.toLowerCase();
+            
+            for (const [category, patterns] of Object.entries(CATEGORY_PATTERNS)) {
+                for (const pattern of patterns) {
+                    if (nameLower.includes(pattern)) {
+                        return category;
+                    }
+                }
+            }
+            return 'Pantry';
+        }
+
+        function migratePantryToCategories() {
+            pantryItems.forEach(item => {
+                if (!item.category) {
+                    item.category = autoCategorizePantryItem(item.name);
+                }
+            });
+        }
+
+        function renderPantryByCategory() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            
+            // Auto-categorize any items missing categories
+            migratePantryToCategories();
+            
+            // Group items by category
+            const grouped = {};
+            pantryItems.forEach(item => {
+                const cat = item.category || 'Pantry';
+                if (!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(item);
+            });
+            
+            // Filter by search
+            const filteredGrouped = {};
+            Object.entries(grouped).forEach(([cat, items]) => {
+                const filtered = items.filter(i => i.name.toLowerCase().includes(search));
+                if (filtered.length > 0) {
+                    filteredGrouped[cat] = filtered;
+                }
+            });
+            
+            const lowStock = pantryItems.filter(i => i.quantity <= 1).length;
+            const expired = pantryItems.filter(i => isExpired(i.expires_at)).length;
+
+            document.getElementById('totalCount').textContent = pantryItems.length;
+            document.getElementById('lowStockCount').textContent = lowStock;
+            document.getElementById('expiredCount').textContent = expired;
+
+            if (expired > 0 || lowStock > 0) {
+                document.getElementById('warningBanner').innerHTML = `
+                    ${expired > 0 ? `<div class="warning-banner danger">⚠️ ${expired} expired/expiring</div>` : ''}
+                    ${lowStock > 0 ? `<div class="warning-banner">ℹ️ ${lowStock} low stock</div>` : ''}
+                `;
+            } else {
+                document.getElementById('warningBanner').innerHTML = '';
+            }
+
+            if (Object.keys(filteredGrouped).length === 0) {
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('itemList').innerHTML = '';
+            } else {
+                document.getElementById('emptyState').style.display = 'none';
+                
+                // Sort categories in display order
+                const categoryOrder = ['Proteins', 'Vegetables', 'Spices', 'Condiments', 'Oils & Vinegars', 'Grains & Pasta', 'Baking', 'Frozen', 'Bakery', 'Dairy & Cheese', 'Pantry', 'Household'];
+                const sortedCategories = categoryOrder.filter(cat => filteredGrouped[cat]);
+                
+                const html = sortedCategories.map(cat => {
+                    const items = filteredGrouped[cat];
+                    const categoryEmojis = {
+                        'Proteins': '🍗',
+                        'Vegetables': '🥬',
+                        'Spices': '🧂',
+                        'Condiments': '🍯',
+                        'Oils & Vinegars': '🫒',
+                        'Grains & Pasta': '🌾',
+                        'Baking': '🎂',
+                        'Frozen': '❄️',
+                        'Bakery': '🥖',
+                        'Dairy & Cheese': '🧀',
+                        'Pantry': '📦',
+                        'Household': '🏠'
+                    };
+                    
+                    return `
+                        <div class="category-section">
+                            <div class="category-header">
+                                <span>${categoryEmojis[cat] || '📂'} ${cat}</span>
+                                <span class="category-count">${items.length}</span>
+                            </div>
+                            <div class="category-items">
+                                ${items.map(item => {
+                                    const expired = isExpired(item.expires_at);
+                                    const expiresIn = getExpiresIn(item.expires_at);
+                                    let cardClass = 'item-card';
+                                    if (expired) cardClass += ' expired';
+                                    else if (item.quantity <= 1) cardClass += ' low-stock';
+
+                                    return `
+                                        <div class="${cardClass}">
+                                            <div class="item-info">
+                                                <div class="item-name">
+                                                    ${item.name}
+                                                    ${item.isStaple ? '<span style="margin-left: 8px; background: #fbbf24; color: #78350f; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">⭐ STAPLE</span>' : ''}
+                                                </div>
+                                                <div class="item-meta">
+                                                    <span>📦 ${item.quantity} ${item.unit}</span>
+                                                    ${expiresIn ? `<span>${expiresIn}</span>` : ''}
+                                                </div>
+                                            </div>
+                                            <div class="item-qty">
+                                                <button class="qty-btn" onclick="updateQuantity(${item.id}, -1)">−</button>
+                                                <div class="qty-display">${item.quantity}</div>
+                                                <button class="qty-btn" onclick="updateQuantity(${item.id}, 1)">+</button>
+                                                <button class="qty-btn" onclick="toggleStaple(${item.id})" style="background: ${item.isStaple ? '#fbbf24' : '#e5e7eb'}; color: ${item.isStaple ? '#78350f' : '#6b7280'}; font-weight: bold;">⭐</button>
+                                                <button class="delete-btn" onclick="deletePantryItem(${item.id})">🗑️</button>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                document.getElementById('itemList').innerHTML = html;
+            }
+        }
+
         function renderUI() {
-            renderPantry();
-            renderShopping();
+            // Check if we should show categorized view
+            const viewMode = localStorage.getItem('pantryViewMode') || 'category';
+            if (viewMode === 'category') {
+                renderPantryByCategory();
+            } else {
+                renderPantry();
+            }
             renderMembers();
+        }
+
+        function togglePantryView() {
+            const viewMode = localStorage.getItem('pantryViewMode') || 'category';
+            const newMode = viewMode === 'category' ? 'item' : 'category';
+            localStorage.setItem('pantryViewMode', newMode);
+            
+            const btn = document.getElementById('viewToggleBtn');
+            if (newMode === 'category') {
+                btn.textContent = '📂 View: Categories';
+                renderPantryByCategory();
+            } else {
+                btn.textContent = '📋 View: Items';
+                renderPantry();
+            }
         }
 
         function renderPantry() {
@@ -2640,6 +2954,8 @@
             }
 
             let addedCount = 0;
+            let skippedCount = 0;
+            const skippedItems = [];
             const failedItems = [];
 
             lines.forEach(line => {
@@ -2650,15 +2966,28 @@
                 const parsed = parseIngredientLine(line);
                 
                 if (parsed.name) {
-                    const item = {
-                        id: Date.now() + Math.random(), // Unique ID for each import
-                        name: parsed.name,
-                        quantity: parsed.quantity,
-                        unit: parsed.unit,
-                        completed: false
-                    };
-                    list.items.push(item);
-                    addedCount++;
+                    // Extract base ingredient name (sanitized, without descriptors)
+                    const baseIngredient = extractBaseIngredient(parsed.name);
+                    
+                    // Check if already in pantry
+                    const inPantry = findDuplicateItem(baseIngredient);
+                    
+                    if (inPantry) {
+                        // Item already in pantry, skip it
+                        skippedCount++;
+                        skippedItems.push(`${parsed.name} (pantry has: ${inPantry.quantity} ${inPantry.unit})`);
+                    } else {
+                        // Item not in pantry, add to shopping list
+                        const item = {
+                            id: Date.now() + Math.random(),
+                            name: parsed.name,
+                            quantity: parsed.quantity,
+                            unit: parsed.unit,
+                            completed: false
+                        };
+                        list.items.push(item);
+                        addedCount++;
+                    }
                 } else {
                     failedItems.push(line);
                 }
@@ -2669,12 +2998,59 @@
             renderShoppingListDetails();
             document.getElementById('ingredientPasteArea').value = '';
 
-            let message = `✅ Added ${addedCount} items!`;
+            let message = `✅ Added ${addedCount} items to shopping list!`;
+            if (skippedCount > 0) {
+                message += `\n\n⏭️ Skipped ${skippedCount} items (already in pantry)`;
+                if (skippedItems.length <= 5) {
+                    message += ':\n' + skippedItems.map(i => '  • ' + i).join('\n');
+                } else {
+                    message += ':\n' + skippedItems.slice(0, 5).map(i => '  • ' + i).join('\n');
+                    message += '\n  ... and ' + (skippedItems.length - 5) + ' more';
+                }
+            }
             if (failedItems.length > 0) {
-                message += `\n\nCouldn't parse ${failedItems.length} items. Try formatting as:\n"10 oz rice" or just "soy sauce"`;
+                message += `\n\n❌ Couldn't parse ${failedItems.length} items. Try formatting as:\n"10 oz rice" or just "soy sauce"`;
             }
             alert(message);
             switchShoppingTab('view');
+        }
+
+        function extractBaseIngredient(ingredientName) {
+            if (!ingredientName) return '';
+            
+            // Common descriptors to remove
+            const descriptors = [
+                'ground', 'sliced', 'diced', 'minced', 'shredded', 'grated', 'chopped',
+                'fresh', 'dried', 'frozen', 'canned', 'raw', 'cooked', 'roasted',
+                'blanched', 'toasted', 'melted', 'softened', 'crushed', 'crumbled',
+                'whole', 'half', 'pieces', 'piece', 'powder', 'paste', 'sauce',
+                'extract', 'juice', 'zest', 'peel', 'rind', 'oil', 'liquid',
+                'seedless', 'boneless', 'skinless', 'unsalted', 'salted', 'sweet',
+                'hot', 'spicy', 'organic', 'grade', 'extra', 'pure', 'heavy',
+                'light', 'low-fat', 'fat-free', 'reduced', 'whipped', 'sour',
+                'plain', 'vanilla', 'chocolate', 'caramel', 'golden', 'dark',
+                'white', 'brown', 'al dente'
+            ];
+            
+            let name = ingredientName.toLowerCase().trim();
+            
+            // Remove descriptors from the end
+            const words = name.split(/\s+/);
+            let cleanedWords = [];
+            
+            for (const word of words) {
+                const cleanWord = word.replace(/[,;:]/g, ''); // Remove punctuation
+                if (!descriptors.includes(cleanWord)) {
+                    cleanedWords.push(word);
+                }
+            }
+            
+            // If all words were descriptors, return original
+            if (cleanedWords.length === 0) {
+                return name;
+            }
+            
+            return cleanedWords.join(' ').trim();
         }
 
         function parseIngredientLine(line) {
