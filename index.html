@@ -826,6 +826,7 @@
             <div class="tabs-inline" id="shoppingTabs">
                 <button class="tab-toggle active" data-form="view">📋 View List</button>
                 <button class="tab-toggle" data-form="add">➕ Add Items</button>
+                <button class="tab-toggle" data-form="import">📝 Import</button>
                 <button class="tab-toggle" data-form="recipes">🍳 Find Recipes</button>
             </div>
 
@@ -855,6 +856,22 @@
                 <div class="button-group">
                     <button type="button" class="btn btn-secondary" onclick="switchShoppingTab('view')">Back</button>
                     <button type="button" class="btn btn-primary" onclick="addItemToShoppingList()">Add Item</button>
+                </div>
+            </div>
+
+            <!-- Import Ingredients -->
+            <div class="form-section" data-form="import">
+                <label>Paste Ingredient List:</label>
+                <textarea id="ingredientPasteArea" placeholder="Paste ingredients here, one per line:&#10;10 oz rice noodles&#10;1 lb ground beef&#10;soy sauce&#10;sugar&#10;salt&#10;pepper&#10;garlic&#10;green onions" style="width: 100%; height: 180px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 12px; margin-bottom: 12px; resize: vertical;"></textarea>
+                <div style="font-size: 12px; color: #6b7280; margin-bottom: 12px; line-height: 1.5;">
+                    💡 Paste ingredients with or without quantities:<br>
+                    • "10 oz rice noodles" → 10, oz<br>
+                    • "1 lb beef" → 1, lb<br>
+                    • "soy sauce" → 1, unit
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" onclick="switchShoppingTab('view')">Back</button>
+                    <button type="button" class="btn btn-primary" onclick="importIngredients()">Import All</button>
                 </div>
             </div>
 
@@ -2342,6 +2359,116 @@
                 console.error('Recipe search error:', error);
                 resultsDiv.innerHTML = `<div style="text-align: center; color: #d32f2f; padding: 20px;">❌ Search error: ${error.message}</div>`;
             }
+        }
+
+        function importIngredients() {
+            if (!currentShoppingListId) {
+                alert('Please select a list first');
+                return;
+            }
+
+            const pastedText = document.getElementById('ingredientPasteArea').value.trim();
+            if (!pastedText) {
+                alert('Please paste ingredients');
+                return;
+            }
+
+            const lines = pastedText.split('\n').filter(line => line.trim());
+            const list = shoppingLists.find(l => l.id === currentShoppingListId);
+            
+            if (!list) {
+                alert('List not found');
+                return;
+            }
+
+            let addedCount = 0;
+            const failedItems = [];
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line) return;
+
+                // Parse the line to extract quantity, unit, and item name
+                const parsed = parseIngredientLine(line);
+                
+                if (parsed.name) {
+                    const item = {
+                        id: Date.now() + Math.random(), // Unique ID for each import
+                        name: parsed.name,
+                        quantity: parsed.quantity,
+                        unit: parsed.unit,
+                        completed: false
+                    };
+                    list.items.push(item);
+                    addedCount++;
+                } else {
+                    failedItems.push(line);
+                }
+            });
+
+            saveData();
+            renderUI();
+            renderShoppingListDetails();
+            document.getElementById('ingredientPasteArea').value = '';
+
+            let message = `✅ Added ${addedCount} items!`;
+            if (failedItems.length > 0) {
+                message += `\n\nCouldn't parse ${failedItems.length} items. Try formatting as:\n"10 oz rice" or just "soy sauce"`;
+            }
+            alert(message);
+            switchShoppingTab('view');
+        }
+
+        function parseIngredientLine(line) {
+            // Examples to handle:
+            // "10 oz rice noodles" → qty: 10, unit: oz, name: rice noodles
+            // "1 lb ground beef" → qty: 1, unit: lb, name: ground beef
+            // "soy sauce" → qty: 1, unit: unit, name: soy sauce
+            // "0.5 cup sugar" → qty: 0.5, unit: cup, name: sugar
+
+            const trimmed = line.trim();
+            if (!trimmed) return { name: null };
+
+            // Common units to look for
+            const units = ['oz', 'lb', 'g', 'kg', 'cup', 'cups', 'tbsp', 'tsp', 'ml', 'l', 'piece', 'pieces', 'can', 'jar', 'box', 'bag'];
+            
+            // Try to find quantity at the start
+            const quantityMatch = trimmed.match(/^([\d.]+)\s*(?:x\s*)?(\w+)?\s+(.*)/);
+            
+            if (quantityMatch) {
+                const qty = parseFloat(quantityMatch[1]);
+                let unit = quantityMatch[2] || 'unit';
+                let name = quantityMatch[3] || '';
+
+                // Check if what we thought was quantity+unit is actually quantity+name
+                if (unit && !units.includes(unit.toLowerCase())) {
+                    // The "unit" is actually part of the name
+                    name = (unit + ' ' + name).trim();
+                    unit = 'unit';
+                }
+
+                // Normalize units
+                if (unit === 'cups') unit = 'cup';
+                if (unit === 'tbsp') unit = 'tbsp';
+                if (unit === 'tsp') unit = 'tsp';
+                if (unit === 'pieces') unit = 'piece';
+                if (units.includes(unit.toLowerCase())) {
+                    unit = unit.toLowerCase();
+                }
+
+                return {
+                    quantity: isNaN(qty) ? 1 : qty,
+                    unit: unit,
+                    name: name.trim() || 'Item'
+                };
+            }
+
+            // No quantity found, treat whole line as item name with default quantity
+            return {
+                quantity: 1,
+                unit: 'unit',
+                name: trimmed
+            };
         }
 
         function renderMembers() {
