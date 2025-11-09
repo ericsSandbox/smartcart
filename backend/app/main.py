@@ -8,7 +8,7 @@ from app.database import engine, Base, get_db
 from fastapi.middleware.cors import CORSMiddleware
 
 # import routers
-from app.routers import health, household, lists, pantry, members, recipes, pricing, circulars
+from app.routers import health, household, lists, pantry, members, recipes, pricing, circulars, gateway
 from app.services.circular_loader import init_circular_loader
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,13 @@ app = FastAPI(title="SmartCart API (dev)")
 # CORS - must be added before routes
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "https://ericsSandbox.github.io",
+        "https://ericsSandbox.github.io/smartcart",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -72,6 +78,7 @@ def startup_event():
 
 
 app.include_router(health.router)
+app.include_router(gateway.router)
 app.include_router(household.router)
 app.include_router(lists.router)
 app.include_router(pantry.router)
