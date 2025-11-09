@@ -889,6 +889,17 @@
             <!-- Add Items to List -->
             <div class="form-section" data-form="add">
                 <label>Add to: <strong id="currentListName"></strong></label>
+                
+                <!-- Preview of existing items -->
+                <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 12px; max-height: 200px; overflow-y: auto;">
+                    <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px; color: #374151;">
+                        Items already in list:
+                    </div>
+                    <div id="shoppingAddItemsPreview" style="font-size: 12px; color: #6b7280;">
+                        <div style="padding: 8px; color: #999; font-style: italic;">Loading...</div>
+                    </div>
+                </div>
+
                 <input type="text" id="shoppingItemName" placeholder="Item name..." />
                 <input type="number" id="shoppingItemQty" placeholder="Quantity" value="1" min="0.1" step="0.1" />
                 <select id="shoppingItemUnit">
@@ -2741,67 +2752,122 @@
             }
         }
 
-        // Merge multiple shopping lists into one master list
+        // Merge multiple shopping lists into one master list - WITH LIST SELECTION
         function mergeShoppingLists() {
             if (shoppingLists.length < 2) {
                 alert('You need at least 2 shopping lists to merge');
                 return;
             }
 
-            const mergeNamePrompt = prompt('Enter name for merged master list (e.g., "Weekly Shopping"):');
-            if (!mergeNamePrompt) return;
+            // Create a custom modal for list selection
+            const listCheckboxes = shoppingLists.map((list, idx) => `
+                <label style="display: flex; align-items: center; padding: 10px; background: #f9fafb; border-radius: 6px; margin-bottom: 8px; cursor: pointer; border: 2px solid transparent;">
+                    <input type="checkbox" class="merge-list-checkbox" data-index="${idx}" value="${list.id}" style="width: 18px; height: 18px; cursor: pointer; margin-right: 10px;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 500; color: #1f2937;">${list.name}</div>
+                        <div style="font-size: 12px; color: #6b7280;">${(list.items || []).length} items</div>
+                    </div>
+                </label>
+            `).join('');
 
-            // Merge all shopping lists into one
-            const mergedItems = {};  // Use object to track quantities by item name (lowercase)
+            // Create modal dialog
+            const modalHtml = `
+                <div id="mergeDialog" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
+                    <div style="background: white; border-radius: 10px; padding: 20px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+                        <h2 style="margin: 0 0 8px 0; color: #1f2937;">Select Lists to Merge</h2>
+                        <p style="color: #6b7280; font-size: 14px; margin: 0 0 16px 0;">Choose 2 or more lists to combine into a master list</p>
+                        
+                        <div style="margin-bottom: 16px; max-height: 300px; overflow-y: auto;">
+                            ${listCheckboxes}
+                        </div>
+
+                        <label style="display: flex; align-items: center; margin-bottom: 16px; padding: 12px; background: #f0f9ff; border-radius: 6px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 500; color: #1f2937;">Name for merged list:</div>
+                                <input type="text" id="mergeListNameInput" placeholder='e.g., "Weekly Shopping"' style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px; margin-top: 6px; font-size: 14px;">
+                            </div>
+                        </label>
+
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="document.getElementById('mergeDialog').remove()" style="flex: 1; padding: 10px; background: #e5e7eb; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">Cancel</button>
+                            <button onclick="confirmMergeSelectedLists()" style="flex: 1; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">🔀 Merge Selected</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        function confirmMergeSelectedLists() {
+            // Get selected lists
+            const selectedCheckboxes = document.querySelectorAll('.merge-list-checkbox:checked');
             
-            // Collect all items from all lists
-            shoppingLists.forEach(list => {
+            if (selectedCheckboxes.length < 2) {
+                alert('Please select at least 2 lists to merge');
+                return;
+            }
+
+            const mergeName = document.getElementById('mergeListNameInput').value.trim();
+            if (!mergeName) {
+                alert('Please enter a name for the merged list');
+                return;
+            }
+
+            // Get selected list IDs
+            const selectedListIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.value));
+            const selectedLists = shoppingLists.filter(l => selectedListIds.includes(l.id));
+
+            // Merge only selected lists
+            const mergedItems = {};  // Track items and which lists they come from
+            
+            selectedLists.forEach(list => {
                 (list.items || []).forEach(item => {
-                    // Use lowercase name as key for duplicate detection
                     const itemKey = item.name.toLowerCase().trim();
                     
                     if (mergedItems[itemKey]) {
-                        // Item already exists, add quantities and increment count
-                        mergedItems[itemKey].quantity += item.quantity;
-                        mergedItems[itemKey].count += 1;
-                        mergedItems[itemKey].originalName = item.name; // Keep original name
+                        // Item exists - add to list count
+                        mergedItems[itemKey].fromLists.add(list.id);
                     } else {
-                        // New item - store it
+                        // New item
                         mergedItems[itemKey] = {
                             name: item.name,
                             quantity: item.quantity,
                             unit: item.unit,
-                            count: 1,
-                            completed: false
+                            completed: false,
+                            fromLists: new Set([list.id])  // Track which lists it comes from
                         };
                     }
                 });
             });
 
-            // Convert to array and create new list with count indicators
-            const mergedItemsArray = Object.values(mergedItems).map((item, idx) => ({
-                id: Date.now() + idx,
-                // Add "x2", "x3" etc if item appears in multiple lists
-                name: item.count > 1 ? `${item.originalName || item.name} x${item.count}` : (item.originalName || item.name),
-                quantity: item.quantity,
-                unit: item.unit,
-                completed: false
-            }));
+            // Convert to array with "x2", "x3" ONLY if duplicate across selected lists
+            const mergedItemsArray = Object.values(mergedItems).map((item, idx) => {
+                const count = item.fromLists.size;  // How many of the selected lists have this item
+                return {
+                    id: Date.now() + idx,
+                    name: count > 1 ? `${item.name} x${count}` : item.name,
+                    quantity: item.quantity,
+                    unit: item.unit,
+                    completed: false
+                };
+            });
 
-            // Sort by category for easier shopping
+            // Sort by category
             mergedItemsArray.sort((a, b) => {
                 const catA = autoCategorizePantryItem(a.name);
                 const catB = autoCategorizePantryItem(b.name);
                 return catA.localeCompare(catB);
             });
 
+            // Create new merged list
             const newMergedList = {
                 id: Date.now(),
-                name: mergeNamePrompt,
+                name: mergeName,
                 items: mergedItemsArray,
                 createdAt: new Date().toISOString(),
                 isMerged: true,
-                sourceLists: shoppingLists.map(l => l.id)
+                sourceLists: selectedListIds
             };
 
             shoppingLists.push(newMergedList);
@@ -2809,10 +2875,14 @@
             saveData();
             renderUI();
             
+            // Close dialog
+            const dialog = document.getElementById('mergeDialog');
+            if (dialog) dialog.remove();
+            
             // Open the merged list
             openShoppingListToShop(newMergedList.id);
             
-            alert(`✅ Created merged list "${mergeNamePrompt}"\n\n${mergedItemsArray.length} unique items from ${shoppingLists.length - 1} lists\n\nItems with duplicates marked with x2, x3, etc.`);
+            alert(`✅ Created merged list "${mergeName}"\n\n${mergedItemsArray.length} total items\n${selectedLists.length} lists combined\n\nItems marked with x2, x3 appear in multiple lists`);
         }
 
         // Toggle shopping category collapse state
@@ -2924,7 +2994,31 @@
             
             if (tab === 'view') {
                 renderShoppingListDetails();
+            } else if (tab === 'add') {
+                renderShoppingAddItemsPreview();
             }
+        }
+
+        function renderShoppingAddItemsPreview() {
+            if (!currentShoppingListId) return;
+            const list = shoppingLists.find(l => l.id === currentShoppingListId);
+            if (!list) return;
+
+            const items = list.items || [];
+            
+            if (items.length === 0) {
+                document.getElementById('shoppingAddItemsPreview').innerHTML = '<div style="padding: 8px; color: #999; font-style: italic;">No items yet. Add your first item below!</div>';
+                return;
+            }
+
+            const itemsHtml = items.map(item => `
+                <div style="padding: 6px 8px; background: white; border-radius: 4px; margin-bottom: 6px; border-left: 3px solid #3b82f6;">
+                    <div style="font-weight: 500; color: #1f2937;">${item.name}</div>
+                    <div style="font-size: 11px; color: #9ca3af;">${item.quantity} ${item.unit}${item.completed ? ' ✓' : ''}</div>
+                </div>
+            `).join('');
+
+            document.getElementById('shoppingAddItemsPreview').innerHTML = itemsHtml;
         }
 
         async function createNewShoppingList() {
@@ -2991,6 +3085,7 @@
                 document.getElementById('shoppingItemName').value = '';
                 document.getElementById('shoppingItemQty').value = '1';
                 renderShoppingListDetails();
+                renderShoppingAddItemsPreview();  // Update preview after adding
             }
         }
 
