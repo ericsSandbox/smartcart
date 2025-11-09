@@ -672,6 +672,13 @@
                 <input type="search" id="searchInput" placeholder="🔍 Search pantry..." />
             </div>
 
+            <div style="display: flex; gap: 8px; padding: 12px; background: #f0f9ff; border-radius: 8px; margin: 12px 12px 0 12px; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="showDataStats()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">📊 Stats</button>
+                <button class="btn btn-secondary" onclick="exportDataAsJSON()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">💾 Backup</button>
+                <button class="btn btn-secondary" onclick="exportDataAsCSV()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">📥 Export CSV</button>
+                <button class="btn btn-secondary" onclick="importDataFromJSON()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">⬆️ Restore</button>
+            </div>
+
             <div class="section-title">Pantry Items</div>
             <div class="item-list" id="itemList"></div>
             <div class="empty-state" id="emptyState">
@@ -1104,6 +1111,184 @@
                 // Backend sync happens in individual create/update/delete functions
                 console.log('Data cached. Backend sync in progress...');
             }
+            
+            // Auto-backup to browser's sessionStorage as safety net
+            sessionStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
+            sessionStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
+            sessionStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
+        }
+
+        // ===== DATA BACKUP & EXPORT FUNCTIONS =====
+        
+        function exportDataAsJSON() {
+            const timestamp = new Date().toISOString().split('T')[0];
+            const backup = {
+                exportDate: new Date().toISOString(),
+                appVersion: '2.0',
+                data: {
+                    pantry: pantryItems,
+                    shoppingLists: shoppingLists,
+                    members: members
+                }
+            };
+            
+            const dataStr = JSON.stringify(backup, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `smartcart-backup-${timestamp}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            alert('✅ Backup downloaded: smartcart-backup-' + timestamp + '.json');
+        }
+
+        function exportDataAsCSV() {
+            const timestamp = new Date().toISOString().split('T')[0];
+            let csv = 'PANTRY INVENTORY EXPORT\n';
+            csv += 'Exported: ' + new Date().toLocaleString() + '\n\n';
+            csv += 'Item Name,Quantity,Unit,Category,Is Staple,Date Added\n';
+            
+            pantryItems.forEach(item => {
+                const staple = item.isStaple ? 'YES' : 'NO';
+                const dateAdded = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '';
+                csv += `"${item.name}",${item.quantity},"${item.unit}","${item.category || ''}","${staple}","${dateAdded}"\n`;
+            });
+            
+            csv += '\n\nSHOPPING LISTS SUMMARY\n';
+            csv += 'List Name,Item Count,Completed Items,Creation Date\n';
+            shoppingLists.forEach(list => {
+                const completed = list.items.filter(i => i.completed).length;
+                const total = list.items.length;
+                const dateCreated = list.createdAt ? new Date(list.createdAt).toLocaleDateString() : '';
+                csv += `"${list.name}",${total},${completed},"${dateCreated}"\n`;
+            });
+            
+            // Detailed shopping items
+            csv += '\n\nDETAILED SHOPPING ITEMS\n';
+            csv += 'List Name,Item Name,Quantity,Unit,Completed,Added Date\n';
+            shoppingLists.forEach(list => {
+                list.items.forEach(item => {
+                    const completed = item.completed ? 'YES' : 'NO';
+                    csv += `"${list.name}","${item.name}",${item.quantity},"${item.unit}","${completed}","${item.createdAt || ''}"\n`;
+                });
+            });
+            
+            csv += '\n\nHOUSEHOLD MEMBERS\n';
+            csv += 'Name,Age,Allergies,Dietary Preferences\n';
+            members.forEach(member => {
+                csv += `"${member.name}","${member.age || ''}","${member.allergies || ''}","${member.dietary_pref || ''}"\n`;
+            });
+            
+            const dataBlob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `smartcart-data-${timestamp}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            alert('✅ CSV export downloaded: smartcart-data-' + timestamp + '.csv');
+        }
+
+        function importDataFromJSON() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const backup = JSON.parse(event.target.result);
+                        
+                        // Validate backup structure
+                        if (!backup.data || !backup.data.pantry || !backup.data.shoppingLists) {
+                            alert('❌ Invalid backup file format');
+                            return;
+                        }
+                        
+                        if (confirm('⚠️ This will REPLACE all current data with the backup.\n\nAre you sure? This action cannot be undone.')) {
+                            // Replace data
+                            pantryItems = backup.data.pantry || [];
+                            shoppingLists = backup.data.shoppingLists || [];
+                            members = backup.data.members || [];
+                            
+                            // Save to localStorage
+                            saveData();
+                            
+                            // Refresh UI
+                            renderUI();
+                            
+                            alert('✅ Data restored successfully!\n\nPantry: ' + pantryItems.length + ' items\nShopping Lists: ' + shoppingLists.length + ' lists\nMembers: ' + members.length + ' members');
+                        }
+                    } catch (err) {
+                        alert('❌ Error reading backup file: ' + err.message);
+                        console.error('Import error:', err);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+
+        function getDataStats() {
+            const pantryByCategory = {};
+            pantryItems.forEach(item => {
+                const cat = item.category || 'Uncategorized';
+                pantryByCategory[cat] = (pantryByCategory[cat] || 0) + 1;
+            });
+            
+            const shoppingStats = {
+                totalLists: shoppingLists.length,
+                totalItems: shoppingLists.reduce((sum, list) => sum + list.items.length, 0),
+                completedItems: shoppingLists.reduce((sum, list) => sum + list.items.filter(i => i.completed).length, 0)
+            };
+            
+            return {
+                pantryCount: pantryItems.length,
+                pantryByCategory: pantryByCategory,
+                stapleCount: pantryItems.filter(i => i.isStaple).length,
+                shoppingStats: shoppingStats,
+                memberCount: members.length,
+                lastUpdated: new Date().toLocaleString()
+            };
+        }
+
+        function showDataStats() {
+            const stats = getDataStats();
+            let statsText = '📊 DATA STATISTICS\n\n';
+            statsText += 'PANTRY:\n';
+            statsText += '  Total Items: ' + stats.pantryCount + '\n';
+            statsText += '  Staple Items: ' + stats.stapleCount + '\n';
+            statsText += '  Categories: ' + Object.keys(stats.pantryByCategory).length + '\n';
+            
+            if (Object.keys(stats.pantryByCategory).length > 0) {
+                statsText += '\n  Items by Category:\n';
+                Object.entries(stats.pantryByCategory).forEach(([cat, count]) => {
+                    statsText += '    • ' + cat + ': ' + count + '\n';
+                });
+            }
+            
+            statsText += '\nSHOPPING:\n';
+            statsText += '  Lists: ' + stats.shoppingStats.totalLists + '\n';
+            statsText += '  Total Items: ' + stats.shoppingStats.totalItems + '\n';
+            statsText += '  Completed: ' + stats.shoppingStats.completedItems + '\n';
+            
+            statsText += '\nOTHER:\n';
+            statsText += '  Members: ' + stats.memberCount + '\n';
+            statsText += '  Last Updated: ' + stats.lastUpdated;
+            
+            alert(statsText);
         }
 
         function setupEventListeners() {
