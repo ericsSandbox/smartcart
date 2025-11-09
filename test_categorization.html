@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Categorization</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .category { margin-bottom: 20px; }
+        .category h3 { color: #1e40af; margin-bottom: 10px; }
+        .item { margin-left: 20px; padding: 5px; }
+        .stats { background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>SmartCart Categorization Test</h1>
+    <div id="results"></div>
+
+    <script>
+        const CATEGORY_PATTERNS = {
+            'Proteins': [
+                'chicken', 'beef', 'pork', 'turkey', 'bacon', 'ham', 'steak', 'fish', 
+                'salmon', 'tuna', 'shrimp', 'crab', 'lobster', 'breast', 'roast', 'chop',
+                'meatball', 'sausage', 'ground', 'stew meat'
+            ],
+            'Vegetables': [
+                'cucumber', 'onion', 'carrot', 'celery', 'lettuce', 'spinach', 'kale',
+                'broccoli', 'cauliflower', 'cabbage', 'peppers', 'squash', 'zucchini',
+                'tomato', 'corn', 'peas', 'beans', 'potato', 'leek', 'garlic', 'beet',
+                'asparagus', 'green beans', 'mushroom', 'avocado', 'lemon', 'lime'
+            ],
+            'Spices': [
+                'turmeric', 'ginger', 'cumin', 'paprika', 'cinnamon', 'nutmeg', 'clove',
+                'oregano', 'basil', 'thyme', 'rosemary', 'sage', 'bay', 'pepper', 'chili',
+                'cayenne', 'seasoning', 'spice', 'salt', 'allspice', 'coriander', 'cardamom',
+                'fennel', 'caraway', 'dill', 'parsley', 'garlic powder', 'onion powder',
+                'curry', 'garam masala', 'chinese 5', 'peruvian', 'saxon', 'tanjin',
+                'poultry', 'taco', 'italian', 'peppercorn', 'mustard seed', 'celery salt'
+            ],
+            'Condiments': [
+                'ketchup', 'mayo', 'mayonnaise', 'mustard', 'sriracha', 'hot sauce',
+                'sauce', 'dressing', 'ranch', 'vinaigrette', 'bbq', 'barbecue',
+                'worcestershire', 'soy sauce', 'teriyaki', 'sweet chili', 'tahini',
+                'peanut butter', 'horseradish', 'honey mustard', 'dijon', 'asian'
+            ],
+            'Oils & Vinegars': [
+                'oil', 'grape seed', 'vegetable', 'olive', 'sesame', 'coconut',
+                'vinegar', 'wine', 'apple cider', 'balsamic', 'rice', 'white', 'red'
+            ],
+            'Grains & Pasta': [
+                'rice', 'basmati', 'jasmine', 'white rice', 'pasta', 'spaghetti',
+                'noodle', 'egg noodles', 'penne', 'rigatoni', 'flour', 'wheat',
+                'barley', 'lentil', 'bean', 'garbanzo', 'crackers', 'breadcrumb',
+                'bread', 'bagel', 'pita'
+            ],
+            'Baking': [
+                'baking', 'yeast', 'sugar', 'syrup', 'honey', 'maple', 'corn syrup',
+                'cream of tartar', 'extract', 'vanilla', 'strawberry', 'mix', 'cake',
+                'flour', 'brown sugar', 'superfine', 'granulated', 'chocolate'
+            ],
+            'Frozen': [
+                'frozen', 'peas', 'pizza', 'pocket', 'hot pocket', 'lasagna',
+                'ice', 'freezer', 'dough', 'pattie'
+            ],
+            'Bakery': [
+                'bagel', 'bread', 'roll', 'croissant', 'pastry', 'wrapper', 'egg roll',
+                'pita', 'tortilla', 'bun', 'breadcrumb', 'nutrigrain', 'bar'
+            ],
+            'Dairy & Cheese': [
+                'milk', 'cheese', 'cream', 'yogurt', 'butter', 'whipped', 'sour',
+                'parmesan', 'provolone', 'cheddar', 'mozzarella', 'swiss', 'feta',
+                'ricotta', 'brie', 'gouda', 'egg', 'stick'
+            ],
+            'Pantry': [
+                'crackers', 'granola', 'cereal', 'soup', 'beans', 'canned', 'coconut water',
+                'vegetarian', 'baked beans', 'jam', 'jellied', 'grenadine', 'gravy'
+            ],
+            'Household': [
+                'ziplock', 'plastic', 'wrap', 'foil', 'aluminum', 'parchment', 'bag',
+                'paper', 'sandwich', 'gallon'
+            ]
+        };
+
+        function autoCategorizePantryItem(itemName) {
+            if (!itemName) return 'Pantry';
+            const nameLower = itemName.toLowerCase();
+            
+            for (const [category, patterns] of Object.entries(CATEGORY_PATTERNS)) {
+                for (const pattern of patterns) {
+                    if (nameLower.includes(pattern)) {
+                        return category;
+                    }
+                }
+            }
+            return 'Pantry';
+        }
+
+        // Load backup data
+        fetch('./smartcart-backup-2025-11-09.json')
+            .then(r => r.json())
+            .then(data => {
+                const items = data.data.pantry;
+                const categorized = {};
+                
+                // Categorize all items
+                items.forEach(item => {
+                    const cat = autoCategorizePantryItem(item.name);
+                    if (!categorized[cat]) {
+                        categorized[cat] = [];
+                    }
+                    categorized[cat].push(item.name);
+                });
+
+                // Sort categories
+                const categoryOrder = ['Proteins', 'Vegetables', 'Spices', 'Condiments', 'Oils & Vinegars', 'Grains & Pasta', 'Baking', 'Frozen', 'Bakery', 'Dairy & Cheese', 'Pantry', 'Household'];
+                const categoryEmojis = {
+                    'Proteins': '🍗',
+                    'Vegetables': '🥬',
+                    'Spices': '🧂',
+                    'Condiments': '🍯',
+                    'Oils & Vinegars': '🫒',
+                    'Grains & Pasta': '🌾',
+                    'Baking': '🎂',
+                    'Frozen': '❄️',
+                    'Bakery': '🥖',
+                    'Dairy & Cheese': '🧀',
+                    'Pantry': '📦',
+                    'Household': '🏠'
+                };
+
+                // Build HTML
+                let html = `<div class="stats">
+                    <h2>Categorization Results</h2>
+                    <p><strong>Total Items:</strong> ${items.length}</p>
+                    <p><strong>Categories:</strong> ${Object.keys(categorized).length}</p>
+                </div>`;
+
+                categoryOrder.forEach(cat => {
+                    if (categorized[cat]) {
+                        html += `<div class="category">
+                            <h3>${categoryEmojis[cat]} ${cat} (${categorized[cat].length})</h3>
+                            <div>`;
+                        categorized[cat].forEach(name => {
+                            html += `<div class="item">• ${name}</div>`;
+                        });
+                        html += `</div></div>`;
+                    }
+                });
+
+                document.getElementById('results').innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById('results').innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
+            });
+    </script>
+</body>
+</html>

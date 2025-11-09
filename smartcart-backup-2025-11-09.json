@@ -1,0 +1,995 @@
+{
+  "exportDate": "2025-11-09T18:36:31.589Z",
+  "appVersion": "2.0",
+  "data": {
+    "pantry": [
+      {
+        "name": "sugar",
+        "quantity": 4,
+        "unit": "lb",
+        "expires_at": null,
+        "id": 1762710428280
+      },
+      {
+        "name": "cucumber ",
+        "quantity": 7,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710451243
+      },
+      {
+        "name": "onions",
+        "quantity": 8,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710466633
+      },
+      {
+        "name": "bagels everything",
+        "quantity": 4,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710512913
+      },
+      {
+        "name": "hot pockets",
+        "quantity": 3,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710525489
+      },
+      {
+        "name": "pizza dough",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710539107
+      },
+      {
+        "name": "butternut squash lasagna ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710555650,
+        "isStaple": false
+      },
+      {
+        "name": "chicken breast",
+        "quantity": 4,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710576894
+      },
+      {
+        "name": "golden wheat sandwich bread",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710608456
+      },
+      {
+        "name": "frozen peas",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710625170
+      },
+      {
+        "name": "bagels megaberry ",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710704962
+      },
+      {
+        "name": "milk",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": "2025-11-10",
+        "id": 1762710765521
+      },
+      {
+        "name": "tahini",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710925508
+      },
+      {
+        "name": "whipped cream",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710952462
+      },
+      {
+        "name": "cream cheese",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710969057
+      },
+      {
+        "name": "celery",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710981026
+      },
+      {
+        "name": "lemons",
+        "quantity": 4,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762710995777
+      },
+      {
+        "name": "cheese sticks",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711077402
+      },
+      {
+        "name": "pizza cheese",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711087222
+      },
+      {
+        "name": "parmesan cheese ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711119816
+      },
+      {
+        "name": "provolone cheese ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711135822
+      },
+      {
+        "name": "egg roll wrappers",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711177939
+      },
+      {
+        "name": "carrots",
+        "quantity": 6,
+        "unit": "lb",
+        "expires_at": null,
+        "id": 1762711211621
+      },
+      {
+        "name": "pork loin",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711262605
+      },
+      {
+        "name": "freezer bacon",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711271027
+      },
+      {
+        "name": "sliced turkey breast",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711280135
+      },
+      {
+        "name": "tumeric",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711323439
+      },
+      {
+        "name": "ground ginger",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711335428
+      },
+      {
+        "name": "curry powder",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711350309
+      },
+      {
+        "name": "chinese 5 spice",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711363874
+      },
+      {
+        "name": "classic poultry seasoning",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711379480
+      },
+      {
+        "name": "eggs",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711391525
+      },
+      {
+        "name": "white pepper",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711408262
+      },
+      {
+        "name": "ground coriander",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711417649
+      },
+      {
+        "name": "garam masala",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711432097
+      },
+      {
+        "name": "oregano",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711448369
+      },
+      {
+        "name": "cream of tartar",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": "2025-11-10",
+        "id": 1762711493751
+      },
+      {
+        "name": "smoked paprika ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711512093
+      },
+      {
+        "name": "citrusy garlic seasoning ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": "2025-11-09",
+        "id": 1762711535641
+      },
+      {
+        "name": "ground cayenne pepper",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711590543
+      },
+      {
+        "name": "apple pie spice",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": "2025-11-09",
+        "id": 1762711650636
+      },
+      {
+        "name": "ground nutmeg",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711668540
+      },
+      {
+        "name": "cumin seed",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711733728
+      },
+      {
+        "name": "chipotle chili powder",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711748024
+      },
+      {
+        "name": "yellow mustard seed",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711759885
+      },
+      {
+        "name": "maple syrup",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711779222
+      },
+      {
+        "name": "ground cinnamon ",
+        "quantity": 3,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711792314
+      },
+      {
+        "name": "vanilla extract",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711818405
+      },
+      {
+        "name": "strawberry extract ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711829655
+      },
+      {
+        "name": "superfine sugar",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711845050
+      },
+      {
+        "name": "cinnamon sticks",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711862819
+      },
+      {
+        "name": "light brown sugar",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711877176
+      },
+      {
+        "name": "baking soda ",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711903762
+      },
+      {
+        "name": "baking powder",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711924219
+      },
+      {
+        "name": "fast rising yeast ",
+        "quantity": 3,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711947296
+      },
+      {
+        "name": "whole cloves",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711959254
+      },
+      {
+        "name": "oregano",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762711974375
+      },
+      {
+        "name": "ground cumin",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712015448
+      },
+      {
+        "name": "peruvian seasoning",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712032850
+      },
+      {
+        "name": "ground allspice ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712049571
+      },
+      {
+        "name": "peppercorns",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712064336
+      },
+      {
+        "name": "soy sauce",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712070693
+      },
+      {
+        "name": "taco seasoning mix",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712083425
+      },
+      {
+        "name": "onion gravy mix",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712094391
+      },
+      {
+        "name": "celery salt",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712117569
+      },
+      {
+        "name": "worcestershire sauce",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712136601
+      },
+      {
+        "name": "balsamic reduction ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712150857
+      },
+      {
+        "name": "onion powder",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712164210
+      },
+      {
+        "name": "chicken bouillon",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712172731
+      },
+      {
+        "name": "bay leaves",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712184778
+      },
+      {
+        "name": "diced tomatoes small",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712196628
+      },
+      {
+        "name": "creamy tomato soup",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712211048
+      },
+      {
+        "name": "italian breadcrumbs",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712223638
+      },
+      {
+        "name": "plain breadcrumbs",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712232341
+      },
+      {
+        "name": "jellied cranberry sauce",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712250718
+      },
+      {
+        "name": "vegetarian baked beans",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712264325
+      },
+      {
+        "name": "mandarin teriyaki sauce",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712279444
+      },
+      {
+        "name": "reaper hot sauce",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712322919
+      },
+      {
+        "name": "crystal hot sauce",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712334896
+      },
+      {
+        "name": "tanjin ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712352142
+      },
+      {
+        "name": "smoked paprika",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712367310
+      },
+      {
+        "name": "italian seasoning",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712380372
+      },
+      {
+        "name": "granulated garlic",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712389708
+      },
+      {
+        "name": "saxon seasoning ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712404444
+      },
+      {
+        "name": "crushed red pepper ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712418886
+      },
+      {
+        "name": "grape seed oil ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712452401
+      },
+      {
+        "name": "vegetable oil",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712471130
+      },
+      {
+        "name": "white wine vinegar",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712496895
+      },
+      {
+        "name": "rice vinegar",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712503903
+      },
+      {
+        "name": "apple cider vinegar",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712515197
+      },
+      {
+        "name": "red wine vinegar",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712555050
+      },
+      {
+        "name": "red cooking wine",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712565087
+      },
+      {
+        "name": "corn syrup",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712582776
+      },
+      {
+        "name": "lemon cake mix",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712594459
+      },
+      {
+        "name": "penne rigatoni ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712612692
+      },
+      {
+        "name": "spaghetti ",
+        "quantity": 3,
+        "unit": "lb",
+        "expires_at": null,
+        "id": 1762712630311
+      },
+      {
+        "name": "egg noodles",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712642499
+      },
+      {
+        "name": "white rice",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712653516
+      },
+      {
+        "name": "basmati rice",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712664732
+      },
+      {
+        "name": "jasmine rice",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712697032
+      },
+      {
+        "name": "pearl barley",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712709414
+      },
+      {
+        "name": "dried red lentils",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712725038
+      },
+      {
+        "name": "dried garbanzo beans",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712738780
+      },
+      {
+        "name": "wheat flour",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712760872
+      },
+      {
+        "name": "white flour",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712768037
+      },
+      {
+        "name": "kosher salt",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712779659
+      },
+      {
+        "name": "peanut butter",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712795440
+      },
+      {
+        "name": "apple nutrigrain bars",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712812524
+      },
+      {
+        "name": "pita chips",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712830698
+      },
+      {
+        "name": "multi grain crackers",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712843758
+      },
+      {
+        "name": "whole rosemary",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712978464
+      },
+      {
+        "name": "sea salt",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762712985069
+      },
+      {
+        "name": "potatoes",
+        "quantity": 8,
+        "unit": "lb",
+        "expires_at": null,
+        "id": 1762713007899
+      },
+      {
+        "name": "butter",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713029516
+      },
+      {
+        "name": "grenadine",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713044210
+      },
+      {
+        "name": "lemon vinaigrette dressing",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713071142
+      },
+      {
+        "name": "honey mustard dressing",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713088739
+      },
+      {
+        "name": "pancake syrup ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713099983
+      },
+      {
+        "name": "white balsamic honey dressing",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713115967
+      },
+      {
+        "name": "coconut water ",
+        "quantity": 3,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713126612
+      },
+      {
+        "name": "sriracha ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713137190
+      },
+      {
+        "name": "ketchup",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713154464
+      },
+      {
+        "name": "mayonnaise ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713175345
+      },
+      {
+        "name": "sweet chili sauce",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713188133
+      },
+      {
+        "name": "asian toasted sesame dressing",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713202595
+      },
+      {
+        "name": "ranch dressing",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713210035
+      },
+      {
+        "name": "spicy barbecue sauce ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713221106
+      },
+      {
+        "name": "barbecue sauce ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713244903
+      },
+      {
+        "name": "raspberry vinaigrette dressing ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713258034
+      },
+      {
+        "name": "dijon mustard ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713271110
+      },
+      {
+        "name": "horseradish mustard",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713281250
+      },
+      {
+        "name": "gallon ziplock bags",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713317111,
+        "isStaple": true
+      },
+      {
+        "name": "parchment paper ",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713339435,
+        "isStaple": true
+      },
+      {
+        "name": "aluminum foil",
+        "quantity": 2,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713352031,
+        "isStaple": true
+      },
+      {
+        "name": "plastic wrap",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713361843
+      },
+      {
+        "name": "sandwich bags",
+        "quantity": 1,
+        "unit": "unit",
+        "expires_at": null,
+        "id": 1762713369679
+      }
+    ],
+    "shoppingLists": [],
+    "members": [
+      {
+        "name": "eric",
+        "age": "49",
+        "allergies": "fish, cheese",
+        "dietary_pref": null,
+        "id": 1762702458870
+      },
+      {
+        "name": "jeanette",
+        "age": "52",
+        "allergies": null,
+        "dietary_pref": "british, tea",
+        "id": 1762702482304
+      },
+      {
+        "name": "flynn",
+        "age": "20",
+        "allergies": null,
+        "dietary_pref": null,
+        "id": 1762702492370
+      },
+      {
+        "name": "judah",
+        "age": "12",
+        "allergies": null,
+        "dietary_pref": null,
+        "id": 1762702501971
+      }
+    ]
+  }
+}
