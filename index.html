@@ -2013,13 +2013,56 @@
             const item = pantryItems.find(i => i.id === id);
             if (item) {
                 item.quantity = Math.max(0, item.quantity + change);
-                if (item.quantity === 0) {
+                
+                // If item is marked as staple and quantity reaches 0, add to Staples list
+                if (item.quantity === 0 && item.isStaple) {
+                    addToStaplesList(item);
+                    deletePantryItem(id);
+                } else if (item.quantity === 0) {
                     deletePantryItem(id);
                 } else {
                     saveData();
                     renderUI();
                 }
             }
+        }
+
+        function toggleStaple(id) {
+            const item = pantryItems.find(i => i.id === id);
+            if (item) {
+                item.isStaple = !item.isStaple;
+                saveData();
+                renderUI();
+            }
+        }
+
+        function addToStaplesList(item) {
+            // Find or create Staples shopping list
+            let staplesList = shoppingLists.find(l => l.name === '⭐ Staples');
+            
+            if (!staplesList) {
+                staplesList = {
+                    id: Date.now(),
+                    name: '⭐ Staples',
+                    items: [],
+                    createdAt: new Date().toISOString()
+                };
+                shoppingLists.push(staplesList);
+            }
+            
+            // Add item to Staples list if not already there
+            const exists = staplesList.items.find(si => si.name.toLowerCase() === item.name.toLowerCase());
+            if (!exists) {
+                staplesList.items.push({
+                    id: Date.now(),
+                    name: item.name,
+                    quantity: 1,
+                    unit: item.unit || 'unit',
+                    completed: false
+                });
+            }
+            
+            saveData();
         }
 
         function isExpired(expiryDate) {
@@ -2083,7 +2126,10 @@
                     return `
                         <div class="${cardClass}">
                             <div class="item-info">
-                                <div class="item-name">${item.name}</div>
+                                <div class="item-name">
+                                    ${item.name}
+                                    ${item.isStaple ? '<span style="margin-left: 8px; background: #fbbf24; color: #78350f; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">⭐ STAPLE</span>' : ''}
+                                </div>
                                 <div class="item-meta">
                                     <span>📦 ${item.quantity} ${item.unit}</span>
                                     ${expiresIn ? `<span>${expiresIn}</span>` : ''}
@@ -2093,6 +2139,7 @@
                                 <button class="qty-btn" onclick="updateQuantity(${item.id}, -1)">−</button>
                                 <div class="qty-display">${item.quantity}</div>
                                 <button class="qty-btn" onclick="updateQuantity(${item.id}, 1)">+</button>
+                                <button class="qty-btn" onclick="toggleStaple(${item.id})" style="background: ${item.isStaple ? '#fbbf24' : '#e5e7eb'}; color: ${item.isStaple ? '#78350f' : '#6b7280'}; font-weight: bold;">⭐</button>
                                 <button class="delete-btn" onclick="deletePantryItem(${item.id})">🗑️</button>
                             </div>
                         </div>
@@ -2123,10 +2170,8 @@
                                 ${total} items • ${completed} completed
                             </div>
                             <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-primary" onclick="editShoppingList(${list.id})" style="flex: 1; padding: 8px; font-size: 12px;">Edit</button>
-                                <button class="btn btn-secondary" onclick="toggleShoppingComplete(${list.id})" style="flex: 1; padding: 8px; font-size: 12px;">
-                                    ${completed === total && total > 0 ? '↩️ Reopen' : '✓ Mark Done'}
-                                </button>
+                                <button class="btn btn-primary" onclick="openShoppingListToShop(${list.id})" style="flex: 1; padding: 8px; font-size: 12px;">🛒 Shop</button>
+                                ${completed === total && total > 0 ? `<button class="btn btn-secondary" onclick="renewShoppingList(${list.id})" style="flex: 1; padding: 8px; font-size: 12px;">🔄 Renew</button>` : `<button class="btn btn-secondary" onclick="markShoppingDone(${list.id})" style="flex: 1; padding: 8px; font-size: 12px;">✓ Done</button>`}
                             </div>
                         </div>
                     `;
@@ -2294,12 +2339,35 @@
             }
         }
 
-        function editShoppingList(listId) {
+        function openShoppingListToShop(listId) {
             currentShoppingListId = listId;
             const list = shoppingLists.find(l => l.id === listId);
             if (list) {
                 document.getElementById('currentListName').textContent = list.name;
-                switchShoppingTab('add');
+                document.getElementById('shoppingListModal').classList.add('active');
+                switchShoppingTab('view');
+                renderShoppingListDetails();
+            }
+        }
+
+        function markShoppingDone(listId) {
+            const list = shoppingLists.find(l => l.id === listId);
+            if (list) {
+                // Mark all as completed
+                list.items.forEach(i => i.completed = true);
+                saveData();
+                renderUI();
+            }
+        }
+
+        function renewShoppingList(listId) {
+            if (confirm('Reset all items to not completed? This will clear the shopping progress.')) {
+                const list = shoppingLists.find(l => l.id === listId);
+                if (list) {
+                    list.items.forEach(i => i.completed = false);
+                    saveData();
+                    renderUI();
+                }
             }
         }
 
