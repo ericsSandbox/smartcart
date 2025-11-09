@@ -1272,24 +1272,76 @@
                 reader.onload = (event) => {
                     try {
                         const backup = JSON.parse(event.target.result);
+                        console.log('Parsed backup file:', backup);
                         
-                        // Validate backup structure
-                        if (!backup.data || !backup.data.pantry || !backup.data.shoppingLists) {
-                            alert('❌ Invalid backup file format');
+                        // Validate backup structure - check if it has data property
+                        if (!backup.data) {
+                            alert('❌ Invalid backup file format: missing data object');
                             return;
                         }
                         
+                        // Extract data with fallbacks
+                        const newPantry = backup.data.pantry || [];
+                        const newShoppingLists = backup.data.shoppingLists || [];
+                        const newMembers = backup.data.members || [];
+                        
+                        console.log('Extracted data:', {
+                            pantry: newPantry.length,
+                            shoppingLists: newShoppingLists.length,
+                            members: newMembers.length
+                        });
+                        
                         if (confirm('⚠️ This will REPLACE all current data with the backup.\n\nAre you sure? This action cannot be undone.')) {
                             // Replace data
-                            pantryItems = backup.data.pantry || [];
-                            shoppingLists = backup.data.shoppingLists || [];
-                            members = backup.data.members || [];
+                            pantryItems = newPantry;
+                            shoppingLists = newShoppingLists;
+                            members = newMembers;
+                            
+                            console.log('Assigned data to variables');
+                            console.log('pantryItems length:', pantryItems.length);
+                            console.log('shoppingLists length:', shoppingLists.length);
+                            console.log('members length:', members.length);
                             
                             // Save to localStorage
-                            saveData();
+                            localStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
+                            localStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
+                            localStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
                             
-                            // Refresh UI
+                            // Also save to sessionStorage
+                            sessionStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
+                            sessionStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
+                            sessionStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
+                            
+                            console.log('Data saved to localStorage and sessionStorage');
+                            
+                            // Verify data was saved
+                            const verifyPantry = JSON.parse(localStorage.getItem(PANTRY_KEY) || '[]');
+                            const verifyShoppingLists = JSON.parse(localStorage.getItem(SHOPPING_KEY) || '[]');
+                            const verifyMembers = JSON.parse(localStorage.getItem(MEMBERS_KEY) || '[]');
+                            
+                            console.log('Verification from localStorage:', {
+                                pantry: verifyPantry.length,
+                                shoppingLists: verifyShoppingLists.length,
+                                members: verifyMembers.length
+                            });
+                            
+                            // Clear search fields to show all items
+                            const searchInput = document.getElementById('searchInput');
+                            if (searchInput) searchInput.value = '';
+                            const shoppingSearch = document.getElementById('shoppingSearch');
+                            if (shoppingSearch) shoppingSearch.value = '';
+                            
+                            // Force complete UI refresh
+                            document.getElementById('itemList').innerHTML = '';
+                            document.getElementById('emptyState').style.display = 'none';
+                            document.getElementById('shoppingLists').innerHTML = '';
+                            document.getElementById('emptyShoppingState').style.display = 'none';
+                            document.getElementById('membersList').innerHTML = '';
+                            
+                            // Now refresh UI with all data
                             renderUI();
+                            
+                            console.log('UI refresh complete');
                             
                             alert('✅ Data restored successfully!\n\nPantry: ' + pantryItems.length + ' items\nShopping Lists: ' + shoppingLists.length + ' lists\nMembers: ' + members.length + ' members');
                         }
