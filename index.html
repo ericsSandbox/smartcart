@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#3b82f6">
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
+    <link rel="manifest" href="/smartcart/manifest.json">
     <!-- html5-qrcode: ZXing-based 1D/2D barcode scanner, optimized for mobile -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
     <!-- jsQR: Lightweight QR code decoder for fallback -->
@@ -3490,6 +3491,21 @@
                     </div>
                 `).join('');
             }
+        }
+
+        // ===== SERVICE WORKER REGISTRATION =====
+        // Enables offline-first functionality and app caching
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/smartcart/sw.js', {
+                    scope: '/smartcart/'
+                }).then((registration) => {
+                    console.log('Service Worker registered successfully:', registration);
+                }).catch((error) => {
+                    console.log('Service Worker registration failed:', error);
+                    // This is optional - app still works without it
+                });
+            });
         }
     </script>
 </body>
