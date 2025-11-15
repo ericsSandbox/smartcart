@@ -963,14 +963,14 @@
         // FIREBASE CONFIGURATION & INITIALIZATION
         // ============================================
         
-        // Firebase configuration - TODO: Replace with your Firebase project config
+        // Firebase configuration
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY_HERE",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyANLrJ54KQJi2R4VaU02DsuA6GxGTO0BQ",
+            authDomain: "smartcart-faf36.firebaseapp.com",
+            projectId: "smartcart-faf36",
+            storageBucket: "smartcart-faf36.firebasestorage.app",
+            messagingSenderId: "36120215522",
+            appId: "1:36120215522:web:720084b2c098555d89efe3"
         };
         
         // Initialize Firebase
@@ -1150,11 +1150,12 @@
             if (!db || !householdId) return false;
             try {
                 await db.collection('households').doc(householdId)
-                    .collection('pantry').doc(itemId).update(updates);
+                    .collection('pantry').doc(String(itemId)).update(updates);
                 console.log('✅ Pantry item updated:', itemId);
                 return true;
             } catch (error) {
                 console.error('Error updating pantry item:', error);
+                alert('Error updating item: ' + error.message);
                 return false;
             }
         }
@@ -1163,11 +1164,12 @@
             if (!db || !householdId) return false;
             try {
                 await db.collection('households').doc(householdId)
-                    .collection('pantry').doc(itemId).delete();
+                    .collection('pantry').doc(String(itemId)).delete();
                 console.log('✅ Pantry item deleted:', itemId);
                 return true;
             } catch (error) {
                 console.error('Error deleting pantry item:', error);
+                alert('Error deleting item: ' + error.message);
                 return false;
             }
         }
@@ -2405,9 +2407,15 @@
         }
 
         async function deletePantryItem(id) {
+            console.log('deletePantryItem called:', id);
             if (confirm('Delete this item?')) {
-                await deletePantryItemFromFirebase(id);
-                // Real-time listener will update UI automatically
+                try {
+                    await deletePantryItemFromFirebase(id);
+                    // Real-time listener will update UI automatically
+                } catch (error) {
+                    console.error('Error in deletePantryItem:', error);
+                    alert('Error deleting item: ' + error.message);
+                }
             }
         }
 
@@ -2419,20 +2427,30 @@
         }
 
         async function updateQuantity(id, change) {
+            console.log('updateQuantity called:', id, change);
             const item = pantryItems.find(i => i.id === id);
+            console.log('Found item:', item);
             if (item) {
                 const newQuantity = Math.max(0, item.quantity + change);
+                console.log('New quantity:', newQuantity);
                 
-                // If item is marked as staple and quantity reaches 0, add to Staples list
-                if (newQuantity === 0 && item.isStaple) {
-                    await addToStaplesList(item);
-                    await deletePantryItem(id);
-                } else if (newQuantity === 0) {
-                    await deletePantryItem(id);
-                } else {
-                    await updatePantryItemInFirebase(id, { quantity: newQuantity });
-                    // Real-time listener will update UI automatically
+                try {
+                    // If item is marked as staple and quantity reaches 0, add to Staples list
+                    if (newQuantity === 0 && item.isStaple) {
+                        await addToStaplesList(item);
+                        await deletePantryItem(id);
+                    } else if (newQuantity === 0) {
+                        await deletePantryItem(id);
+                    } else {
+                        await updatePantryItemInFirebase(id, { quantity: newQuantity });
+                        // Real-time listener will update UI automatically
+                    }
+                } catch (error) {
+                    console.error('Error in updateQuantity:', error);
+                    alert('Error updating quantity: ' + error.message);
                 }
+            } else {
+                console.error('Item not found with id:', id);
             }
         }
 
@@ -2706,11 +2724,11 @@
                                                 </div>
                                             </div>
                                             <div class="item-qty">
-                                                <button class="qty-btn" onclick="updateQuantity(${item.id}, -1)">−</button>
+                                                <button class="qty-btn" onclick="updateQuantity('${item.id}', -1)">−</button>
                                                 <div class="qty-display">${item.quantity}</div>
-                                                <button class="qty-btn" onclick="updateQuantity(${item.id}, 1)">+</button>
-                                                <button class="qty-btn" onclick="toggleStaple(${item.id})" style="background: ${item.isStaple ? '#fbbf24' : '#e5e7eb'}; color: ${item.isStaple ? '#78350f' : '#6b7280'}; font-weight: bold;">⭐</button>
-                                                <button class="delete-btn" onclick="deletePantryItem(${item.id})">🗑️</button>
+                                                <button class="qty-btn" onclick="updateQuantity('${item.id}', 1)">+</button>
+                                                <button class="qty-btn" onclick="toggleStaple('${item.id}')" style="background: ${item.isStaple ? '#fbbf24' : '#e5e7eb'}; color: ${item.isStaple ? '#78350f' : '#6b7280'}; font-weight: bold;">⭐</button>
+                                                <button class="delete-btn" onclick="deletePantryItem('${item.id}')">🗑️</button>
                                             </div>
                                         </div>
                                     `;
@@ -2818,11 +2836,11 @@
                                 </div>
                             </div>
                             <div class="item-qty">
-                                <button class="qty-btn" onclick="updateQuantity(${item.id}, -1)">−</button>
+                                <button class="qty-btn" onclick="updateQuantity('${item.id}', -1)">−</button>
                                 <div class="qty-display">${item.quantity}</div>
-                                <button class="qty-btn" onclick="updateQuantity(${item.id}, 1)">+</button>
-                                <button class="qty-btn" onclick="toggleStaple(${item.id})" style="background: ${item.isStaple ? '#fbbf24' : '#e5e7eb'}; color: ${item.isStaple ? '#78350f' : '#6b7280'}; font-weight: bold;">⭐</button>
-                                <button class="delete-btn" onclick="deletePantryItem(${item.id})">🗑️</button>
+                                <button class="qty-btn" onclick="updateQuantity('${item.id}', 1)">+</button>
+                                <button class="qty-btn" onclick="toggleStaple('${item.id}')" style="background: ${item.isStaple ? '#fbbf24' : '#e5e7eb'}; color: ${item.isStaple ? '#78350f' : '#6b7280'}; font-weight: bold;">⭐</button>
+                                <button class="delete-btn" onclick="deletePantryItem('${item.id}')">🗑️</button>
                             </div>
                         </div>
                     `;
