@@ -10,6 +10,12 @@
     <title>SmartCart - Household Shopping & Pantry Manager</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%233b82f6' width='180' height='180'/><text x='50%' y='50%' font-size='90' font-weight='bold' text-anchor='middle' dominant-baseline='central' fill='white'>🛒</text></svg>">
     <link rel="manifest" href="/smartcart/manifest.json">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    
     <!-- html5-qrcode: ZXing-based 1D/2D barcode scanner, optimized for mobile -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
     <!-- jsQR: Lightweight QR code decoder for fallback -->
@@ -954,173 +960,77 @@
 
     <script>
         // ============================================
-        // API SERVICE LAYER - Backend Communication
+        // FIREBASE CONFIGURATION & INITIALIZATION
         // ============================================
         
-        // Configuration
-        const API_BASE_URL = 'http://localhost:8000';
+        // Firebase configuration - TODO: Replace with your Firebase project config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        // Initialize Firebase
+        let db = null;
         let householdId = null;
-        let useBackend = true;
         
-        // Initialize API - check if backend is available
-        async function initAPI() {
+        async function initFirebase() {
             try {
-                const response = await fetch(`${API_BASE_URL}/init`);
-                if (response.ok) {
-                    const data = await response.json();
-                    householdId = data.household_id;
-                    console.log('✅ Backend connected. Household ID:', householdId);
-                    useBackend = true;
-                    return true;
-                }
-            } catch (error) {
-                console.warn('⚠️ Backend unavailable, using localStorage only');
-                useBackend = false;
-            }
-            return false;
-        }
-
-        // API Helper - Fetch with error handling
-        async function apiCall(method, endpoint, data = null) {
-            try {
-                const options = {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' }
-                };
-                if (data) options.body = JSON.stringify(data);
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
                 
-                const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
-                if (!response.ok) throw new Error(`API ${response.status}`);
-                return await response.json();
+                // Enable offline persistence
+                await db.enablePersistence({
+                    synchronizeTabs: true
+                }).catch((err) => {
+                    if (err.code === 'failed-precondition') {
+                        console.warn('⚠️ Multiple tabs open, persistence only in first tab');
+                    } else if (err.code === 'unimplemented') {
+                        console.warn('⚠️ Browser does not support offline persistence');
+                    }
+                });
+                
+                // Get or create household ID from localStorage
+                householdId = localStorage.getItem('smartcart_household_id');
+                if (!householdId) {
+                    householdId = 'household_' + Date.now();
+                    localStorage.setItem('smartcart_household_id', householdId);
+                }
+                
+                console.log('✅ Firebase connected. Household ID:', householdId);
+                return true;
             } catch (error) {
-                console.error('API call failed:', error);
-                throw error;
+                console.error('❌ Firebase initialization failed:', error);
+                return false;
             }
         }
 
         // ============================================
-        // PANTRY API CALLS
+        // FIREBASE DATA LAYER - Real-time Sync
         // ============================================
-        
-        async function fetchPantryFromAPI() {
-            if (!useBackend || !householdId) return null;
-            try {
-                const items = await apiCall('GET', `/households/${householdId}/pantry`);
-                console.log('📦 Pantry loaded from backend:', items.length, 'items');
-                return items;
-            } catch (error) {
-                console.error('Pantry fetch failed:', error);
-                return null;
-            }
-        }
-
-        async function createPantryItemAPI(item) {
-            if (!useBackend || !householdId) return null;
-            try {
-                return await apiCall('POST', `/households/${householdId}/pantry`, {
-                    name: item.name,
-                    quantity: item.quantity,
-                    unit: item.unit,
-                    expires_at: item.expires_at
-                });
-            } catch (error) { return null; }
-        }
-
-        async function updatePantryItemAPI(itemId, updates) {
-            if (!useBackend || !householdId) return null;
-            try {
-                return await apiCall('PATCH', `/households/${householdId}/pantry/${itemId}`, updates);
-            } catch (error) { return null; }
-        }
-
-        async function deletePantryItemAPI(itemId) {
-            if (!useBackend || !householdId) return false;
-            try {
-                await apiCall('DELETE', `/households/${householdId}/pantry/${itemId}`);
-                return true;
-            } catch (error) { return false; }
-        }
-
-        // ============================================
-        // SHOPPING LIST API CALLS
-        // ============================================
-        
-        async function fetchShoppingListsFromAPI() {
-            if (!useBackend || !householdId) return null;
-            try {
-                const lists = await apiCall('GET', `/households/${householdId}/lists`);
-                console.log('📝 Shopping lists loaded from backend:', lists.length, 'lists');
-                return lists;
-            } catch (error) { return null; }
-        }
-
-        async function createShoppingListAPI(listData) {
-            if (!useBackend || !householdId) return null;
-            try {
-                return await apiCall('POST', `/households/${householdId}/lists`, { name: listData.name });
-            } catch (error) { return null; }
-        }
-
-        async function deleteShoppingListAPI(listId) {
-            if (!useBackend || !householdId) return false;
-            try {
-                await apiCall('DELETE', `/households/${householdId}/lists/${listId}`);
-                return true;
-            } catch (error) { return false; }
-        }
-
-        // ============================================
-        // MEMBERS API CALLS
-        // ============================================
-        
-        async function fetchMembersFromAPI() {
-            if (!useBackend || !householdId) return null;
-            try {
-                const membersList = await apiCall('GET', `/households/${householdId}/members`);
-                console.log('👥 Members loaded from backend:', membersList.length, 'members');
-                return membersList;
-            } catch (error) { return null; }
-        }
-
-        async function createMemberAPI(member) {
-            if (!useBackend || !householdId) return null;
-            try {
-                return await apiCall('POST', `/households/${householdId}/members`, {
-                    name: member.name,
-                    age: member.age,
-                    allergies: member.allergies,
-                    dietary_pref: member.dietary_pref
-                });
-            } catch (error) { return null; }
-        }
-
-        async function deleteMemberAPI(memberId) {
-            if (!useBackend || !householdId) return false;
-            try {
-                await apiCall('DELETE', `/households/${householdId}/members/${memberId}`);
-                return true;
-            } catch (error) { return false; }
-        }
-
-        // ============================================
-        // LOCAL STORAGE LAYER - Fallback & Cache
-        // ============================================
-
-        const PANTRY_KEY = 'smartcart_pantry';
-        const SHOPPING_KEY = 'smartcart_shopping';
-        const MEMBERS_KEY = 'smartcart_members';
 
         let pantryItems = [];
         let shoppingLists = [];
         let members = [];
         let scannerActive = false;
         let lastDetectedBarcode = null;
+        
+        // Firestore listeners (for cleanup)
+        let pantryUnsubscribe = null;
+        let shoppingUnsubscribe = null;
+        let membersUnsubscribe = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // Initialize backend connection
-            await initAPI();
+            // Initialize Firebase
+            await initFirebase();
             
-            // Load data (from backend if available, else localStorage)
+            // Set up real-time listeners
+            setupFirestoreListeners();
+            
+            // Load initial data
             await loadData();
             setupEventListeners();
             
@@ -1135,46 +1045,281 @@
             initScanner(); // Initialize barcode scanner
         });
 
+        function setupFirestoreListeners() {
+            if (!db || !householdId) return;
+            
+            // Listen to pantry changes in real-time
+            pantryUnsubscribe = db.collection('households').doc(householdId)
+                .collection('pantry')
+                .onSnapshot((snapshot) => {
+                    pantryItems = [];
+                    snapshot.forEach((doc) => {
+                        pantryItems.push({ id: doc.id, ...doc.data() });
+                    });
+                    console.log('🔄 Pantry updated:', pantryItems.length, 'items');
+                    renderUI();
+                }, (error) => {
+                    console.error('Pantry listener error:', error);
+                });
+            
+            // Listen to shopping lists changes in real-time
+            shoppingUnsubscribe = db.collection('households').doc(householdId)
+                .collection('shoppingLists')
+                .onSnapshot((snapshot) => {
+                    shoppingLists = [];
+                    snapshot.forEach((doc) => {
+                        shoppingLists.push({ id: doc.id, ...doc.data() });
+                    });
+                    console.log('🔄 Shopping lists updated:', shoppingLists.length, 'lists');
+                    renderUI();
+                }, (error) => {
+                    console.error('Shopping lists listener error:', error);
+                });
+            
+            // Listen to members changes in real-time
+            membersUnsubscribe = db.collection('households').doc(householdId)
+                .collection('members')
+                .onSnapshot((snapshot) => {
+                    members = [];
+                    snapshot.forEach((doc) => {
+                        members.push({ id: doc.id, ...doc.data() });
+                    });
+                    console.log('🔄 Members updated:', members.length, 'members');
+                    renderUI();
+                }, (error) => {
+                    console.error('Members listener error:', error);
+                });
+        }
+
         async function loadData() {
-            // Try to load from backend first
-            if (useBackend && householdId) {
-                const pantryFromAPI = await fetchPantryFromAPI();
-                const shoppingFromAPI = await fetchShoppingListsFromAPI();
-                const membersFromAPI = await fetchMembersFromAPI();
+            if (!db || !householdId) {
+                console.error('Firebase not initialized');
+                return;
+            }
+            
+            try {
+                // Load pantry items
+                const pantrySnapshot = await db.collection('households').doc(householdId)
+                    .collection('pantry').get();
+                pantryItems = pantrySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
-                if (pantryFromAPI) pantryItems = pantryFromAPI;
-                if (shoppingFromAPI) shoppingLists = shoppingFromAPI;
-                if (membersFromAPI) members = membersFromAPI;
+                // Load shopping lists
+                const shoppingSnapshot = await db.collection('households').doc(householdId)
+                    .collection('shoppingLists').get();
+                shoppingLists = shoppingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
-                // Cache to localStorage
-                localStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
-                localStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
-                localStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
-            } else {
-                // Fallback to localStorage only
-                pantryItems = JSON.parse(localStorage.getItem(PANTRY_KEY) || '[]');
-                shoppingLists = JSON.parse(localStorage.getItem(SHOPPING_KEY) || '[]');
-                members = JSON.parse(localStorage.getItem(MEMBERS_KEY) || '[]');
-                console.log('Using localStorage (backend unavailable)');
+                // Load members
+                const membersSnapshot = await db.collection('households').doc(householdId)
+                    .collection('members').get();
+                members = membersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                console.log('📦 Initial load complete:', pantryItems.length, 'pantry,', 
+                           shoppingLists.length, 'lists,', members.length, 'members');
+            } catch (error) {
+                console.error('Error loading data:', error);
             }
         }
 
-        async function saveData() {
-            // Always save to localStorage (cache)
-            localStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
-            localStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
-            localStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
-            
-            // Also sync to backend if available
-            if (useBackend && householdId) {
-                // Backend sync happens in individual create/update/delete functions
-                console.log('Data cached. Backend sync in progress...');
+        // ============================================
+        // FIREBASE CRUD OPERATIONS
+        // ============================================
+        
+        // Pantry operations
+        async function addPantryItemToFirebase(item) {
+            if (!db || !householdId) return null;
+            try {
+                const docRef = await db.collection('households').doc(householdId)
+                    .collection('pantry').add({
+                        name: item.name,
+                        quantity: item.quantity || 1,
+                        unit: item.unit || 'unit',
+                        expires_at: item.expires_at || null,
+                        category: item.category || null,
+                        isStaple: item.isStaple || false,
+                        created_at: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                console.log('✅ Pantry item added:', docRef.id);
+                return docRef.id;
+            } catch (error) {
+                console.error('Error adding pantry item:', error);
+                return null;
+            }
+        }
+        
+        async function updatePantryItemInFirebase(itemId, updates) {
+            if (!db || !householdId) return false;
+            try {
+                await db.collection('households').doc(householdId)
+                    .collection('pantry').doc(itemId).update(updates);
+                console.log('✅ Pantry item updated:', itemId);
+                return true;
+            } catch (error) {
+                console.error('Error updating pantry item:', error);
+                return false;
+            }
+        }
+        
+        async function deletePantryItemFromFirebase(itemId) {
+            if (!db || !householdId) return false;
+            try {
+                await db.collection('households').doc(householdId)
+                    .collection('pantry').doc(itemId).delete();
+                console.log('✅ Pantry item deleted:', itemId);
+                return true;
+            } catch (error) {
+                console.error('Error deleting pantry item:', error);
+                return false;
+            }
+        }
+        
+        // Shopping list operations
+        async function addShoppingListToFirebase(list) {
+            if (!db || !householdId) return null;
+            try {
+                const docRef = await db.collection('households').doc(householdId)
+                    .collection('shoppingLists').add({
+                        name: list.name,
+                        items: list.items || [],
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        isMerged: list.isMerged || false,
+                        sourceLists: list.sourceLists || []
+                    });
+                console.log('✅ Shopping list added:', docRef.id);
+                return docRef.id;
+            } catch (error) {
+                console.error('Error adding shopping list:', error);
+                return null;
+            }
+        }
+        
+        async function updateShoppingListInFirebase(listId, updates) {
+            if (!db || !householdId) return false;
+            try {
+                await db.collection('households').doc(householdId)
+                    .collection('shoppingLists').doc(listId).update(updates);
+                console.log('✅ Shopping list updated:', listId);
+                return true;
+            } catch (error) {
+                console.error('Error updating shopping list:', error);
+                return false;
+            }
+        }
+        
+        async function deleteShoppingListFromFirebase(listId) {
+            if (!db || !householdId) return false;
+            try {
+                await db.collection('households').doc(householdId)
+                    .collection('shoppingLists').doc(listId).delete();
+                console.log('✅ Shopping list deleted:', listId);
+                return true;
+            } catch (error) {
+                console.error('Error deleting shopping list:', error);
+                return false;
+            }
+        }
+        
+        // Member operations
+        async function addMemberToFirebase(member) {
+            if (!db || !householdId) return null;
+            try {
+                const docRef = await db.collection('households').doc(householdId)
+                    .collection('members').add({
+                        name: member.name,
+                        age: member.age || null,
+                        allergies: member.allergies || null,
+                        dietary_pref: member.dietary_pref || null,
+                        created_at: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                console.log('✅ Member added:', docRef.id);
+                return docRef.id;
+            } catch (error) {
+                console.error('Error adding member:', error);
+                return null;
+            }
+        }
+        
+        async function deleteMemberFromFirebase(memberId) {
+            if (!db || !householdId) return false;
+            try {
+                await db.collection('households').doc(householdId)
+                    .collection('members').doc(memberId).delete();
+                console.log('✅ Member deleted:', memberId);
+                return true;
+            } catch (error) {
+                console.error('Error deleting member:', error);
+                return false;
+            }
+        }
+
+        // Import backup data to Firebase
+        async function importToFirebase(pantry, shoppingLists, members) {
+            if (!db || !householdId) {
+                alert('❌ Firebase not initialized');
+                return;
             }
             
-            // Auto-backup to browser's sessionStorage as safety net
-            sessionStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
-            sessionStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
-            sessionStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
+            const progressDiv = document.createElement('div');
+            progressDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 10000; min-width: 300px; text-align: center;';
+            progressDiv.innerHTML = '<div style="font-size: 18px; font-weight: bold; margin-bottom: 20px;">Importing to Firebase...</div><div id="importProgress" style="color: #666;">Starting...</div>';
+            document.body.appendChild(progressDiv);
+            
+            const updateProgress = (msg) => {
+                document.getElementById('importProgress').innerHTML = msg;
+            };
+            
+            try {
+                // Clear existing data first
+                updateProgress('Clearing old data...');
+                const batch = db.batch();
+                
+                // Delete all existing pantry items
+                const pantrySnapshot = await db.collection('households').doc(householdId).collection('pantry').get();
+                pantrySnapshot.docs.forEach(doc => batch.delete(doc.ref));
+                
+                // Delete all existing shopping lists
+                const shoppingSnapshot = await db.collection('households').doc(householdId).collection('shoppingLists').get();
+                shoppingSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+                
+                // Delete all existing members
+                const membersSnapshot = await db.collection('households').doc(householdId).collection('members').get();
+                membersSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+                
+                await batch.commit();
+                
+                // Import pantry items
+                updateProgress(`Importing ${pantry.length} pantry items...`);
+                for (let i = 0; i < pantry.length; i++) {
+                    const item = pantry[i];
+                    await addPantryItemToFirebase(item);
+                    if (i % 10 === 0) {
+                        updateProgress(`Importing pantry ${i}/${pantry.length}...`);
+                    }
+                }
+                
+                // Import shopping lists
+                updateProgress(`Importing ${shoppingLists.length} shopping lists...`);
+                for (let list of shoppingLists) {
+                    await addShoppingListToFirebase(list);
+                }
+                
+                // Import members
+                updateProgress(`Importing ${members.length} members...`);
+                for (let member of members) {
+                    await addMemberToFirebase(member);
+                }
+                
+                updateProgress('✅ Import complete!');
+                
+                setTimeout(() => {
+                    document.body.removeChild(progressDiv);
+                    alert(`✅ Data imported to Firebase!\n\nPantry: ${pantry.length} items\nShopping Lists: ${shoppingLists.length} lists\nMembers: ${members.length} members\n\nAll devices will sync automatically!`);
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Import error:', error);
+                document.body.removeChild(progressDiv);
+                alert('❌ Import failed: ' + error.message);
+            }
         }
 
         // ===== DATA BACKUP & EXPORT FUNCTIONS =====
@@ -1292,59 +1437,8 @@
                             members: newMembers.length
                         });
                         
-                        if (confirm('⚠️ This will REPLACE all current data with the backup.\n\nAre you sure? This action cannot be undone.')) {
-                            // Replace data
-                            pantryItems = newPantry;
-                            shoppingLists = newShoppingLists;
-                            members = newMembers;
-                            
-                            console.log('Assigned data to variables');
-                            console.log('pantryItems length:', pantryItems.length);
-                            console.log('shoppingLists length:', shoppingLists.length);
-                            console.log('members length:', members.length);
-                            
-                            // Save to localStorage
-                            localStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
-                            localStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
-                            localStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
-                            
-                            // Also save to sessionStorage
-                            sessionStorage.setItem(PANTRY_KEY, JSON.stringify(pantryItems));
-                            sessionStorage.setItem(SHOPPING_KEY, JSON.stringify(shoppingLists));
-                            sessionStorage.setItem(MEMBERS_KEY, JSON.stringify(members));
-                            
-                            console.log('Data saved to localStorage and sessionStorage');
-                            
-                            // Verify data was saved
-                            const verifyPantry = JSON.parse(localStorage.getItem(PANTRY_KEY) || '[]');
-                            const verifyShoppingLists = JSON.parse(localStorage.getItem(SHOPPING_KEY) || '[]');
-                            const verifyMembers = JSON.parse(localStorage.getItem(MEMBERS_KEY) || '[]');
-                            
-                            console.log('Verification from localStorage:', {
-                                pantry: verifyPantry.length,
-                                shoppingLists: verifyShoppingLists.length,
-                                members: verifyMembers.length
-                            });
-                            
-                            // Clear search fields to show all items
-                            const searchInput = document.getElementById('searchInput');
-                            if (searchInput) searchInput.value = '';
-                            const shoppingSearch = document.getElementById('shoppingSearch');
-                            if (shoppingSearch) shoppingSearch.value = '';
-                            
-                            // Force complete UI refresh
-                            document.getElementById('itemList').innerHTML = '';
-                            document.getElementById('emptyState').style.display = 'none';
-                            document.getElementById('shoppingLists').innerHTML = '';
-                            document.getElementById('emptyShoppingState').style.display = 'none';
-                            document.getElementById('membersList').innerHTML = '';
-                            
-                            // Now refresh UI with all data
-                            renderUI();
-                            
-                            console.log('UI refresh complete');
-                            
-                            alert('✅ Data restored successfully!\n\nPantry: ' + pantryItems.length + ' items\nShopping Lists: ' + shoppingLists.length + ' lists\nMembers: ' + members.length + ' members');
+                        if (confirm('⚠️ This will REPLACE all current data in Firebase with the backup.\n\nAre you sure? This action cannot be undone.')) {
+                            importToFirebase(newPantry, newShoppingLists, newMembers);
                         }
                     } catch (err) {
                         alert('❌ Error reading backup file: ' + err.message);
@@ -2191,30 +2285,29 @@
             }
         };
 
-        window.addScannedItem = function(name) {
+        window.addScannedItem = async function(name) {
             // Check for duplicate
             const existing = findDuplicateItem(name);
             
             if (existing) {
                 // Add to existing item
                 const addQty = parseFloat(document.getElementById('scannedQty').value);
-                existing.quantity += addQty;
-                alert(`✅ Added ${addQty} unit(s) to existing "${existing.name}"\n\nNew total: ${existing.quantity} ${existing.unit}`);
+                const newQuantity = existing.quantity + addQty;
+                await updatePantryItemInFirebase(existing.id, { quantity: newQuantity });
+                alert(`✅ Added ${addQty} unit(s) to existing "${existing.name}"\n\nNew total: ${newQuantity} ${existing.unit}`);
             } else {
                 // Create new item
                 const item = {
-                    id: Date.now(),
                     name: name,
                     quantity: parseFloat(document.getElementById('scannedQty').value),
                     unit: document.getElementById('scannedUnit').value,
                     expires_at: document.getElementById('scannedExpires').value || null
                 };
-                pantryItems.push(item);
+                await addPantryItemToFirebase(item);
                 alert(`➕ Created new entry: "${name}"`);
             }
             
-            saveData();
-            renderUI();
+            // Real-time listener will update UI automatically
             document.getElementById('addModal').classList.remove('active');
             document.getElementById('scannerResult').innerHTML = '';
             document.getElementById('barcodeInput').value = '';
@@ -2236,23 +2329,26 @@
             if (existing) {
                 // Add to existing item
                 const addQty = parseFloat(document.getElementById('manualQty').value || 1);
-                existing.quantity += addQty;
-                alert(`✅ Added ${addQty} unit(s) to existing "${existing.name}"\n\nNew total: ${existing.quantity} ${existing.unit}`);
+                const newQuantity = existing.quantity + addQty;
+                (async () => {
+                    await updatePantryItemInFirebase(existing.id, { quantity: newQuantity });
+                    alert(`✅ Added ${addQty} unit(s) to existing "${existing.name}"\n\nNew total: ${newQuantity} ${existing.unit}`);
+                })();
             } else {
                 // Create new item
                 const item = {
-                    id: Date.now(),
                     name: name,
                     quantity: parseFloat(document.getElementById('manualQty').value || 1),
                     unit: document.getElementById('manualUnit').value,
                     expires_at: null
                 };
-                pantryItems.push(item);
-                alert(`➕ Created new entry: "${name}"`);
+                (async () => {
+                    await addPantryItemToFirebase(item);
+                    alert(`➕ Created new entry: "${name}"`);
+                })();
             }
             
-            saveData();
-            renderUI();
+            // Real-time listener will update UI automatically
             document.getElementById('addModal').classList.remove('active');
             document.getElementById('scannerResult').innerHTML = '';
             document.getElementById('barcodeInput').value = '';
@@ -2272,10 +2368,11 @@
                 // Add to existing item
                 const addQty = parseFloat(document.getElementById('itemQty').value || 1);
                 const oldQty = existing.quantity;
-                existing.quantity += addQty;
-                alert(`✅ Smart Duplicate Detection!\n\nAdded ${addQty} unit(s) to existing "${existing.name}"\n\nOld total: ${oldQty} ${existing.unit}\nNew total: ${existing.quantity} ${existing.unit}`);
+                const newQty = oldQty + addQty;
+                await updatePantryItemInFirebase(existing.id, { quantity: newQty });
+                alert(`✅ Smart Duplicate Detection!\n\nAdded ${addQty} unit(s) to existing "${existing.name}"\n\nOld total: ${oldQty} ${existing.unit}\nNew total: ${newQty} ${existing.unit}`);
             } else {
-                // Create new item
+                // Create new item in Firebase
                 const item = {
                     name: name,
                     quantity: parseFloat(document.getElementById('itemQty').value || 1),
@@ -2283,27 +2380,11 @@
                     expires_at: document.getElementById('itemExpires').value || null
                 };
                 
-                // Try to create in backend first
-                if (useBackend && householdId) {
-                    const apiItem = await createPantryItemAPI(item);
-                    if (apiItem) {
-                        pantryItems.push(apiItem);
-                        console.log('✅ Item created in backend');
-                    } else {
-                        // Fallback to local
-                        item.id = Date.now();
-                        pantryItems.push(item);
-                        console.log('⚠️ Created locally (backend sync failed)');
-                    }
-                } else {
-                    item.id = Date.now();
-                    pantryItems.push(item);
-                }
+                await addPantryItemToFirebase(item);
                 alert(`➕ Created new entry: "${name}"`);
             }
             
-            saveData();
-            renderUI();
+            // Real-time listener will update UI automatically
             document.getElementById('addModal').classList.remove('active');
             document.getElementById('addForm').reset();
         }
@@ -2316,106 +2397,81 @@
                 dietary_pref: document.getElementById('memberDiet').value || null
             };
             
-            // Try to create in backend first
-            if (useBackend && householdId) {
-                const apiMember = await createMemberAPI(member);
-                if (apiMember) {
-                    members.push(apiMember);
-                    console.log('✅ Member created in backend');
-                } else {
-                    member.id = Date.now();
-                    members.push(member);
-                    console.log('⚠️ Created locally (backend sync failed)');
-                }
-            } else {
-                member.id = Date.now();
-                members.push(member);
-            }
+            await addMemberToFirebase(member);
             
-            saveData();
-            renderUI();
+            // Real-time listener will update UI automatically
             document.getElementById('addMemberForm').reset();
             document.getElementById('addMemberModal').classList.remove('active');
         }
 
         async function deletePantryItem(id) {
             if (confirm('Delete this item?')) {
-                // Try to delete from backend first
-                if (useBackend && householdId) {
-                    await deletePantryItemAPI(id);
-                }
-                pantryItems = pantryItems.filter(i => i.id !== id);
-                saveData();
-                renderUI();
+                await deletePantryItemFromFirebase(id);
+                // Real-time listener will update UI automatically
             }
         }
 
         async function deleteMember(id) {
             if (confirm('Delete this member?')) {
-                // Try to delete from backend first
-                if (useBackend && householdId) {
-                    await deleteMemberAPI(id);
-                }
-                members = members.filter(m => m.id !== id);
-                saveData();
-                renderUI();
+                await deleteMemberFromFirebase(id);
+                // Real-time listener will update UI automatically
             }
         }
 
-        function updateQuantity(id, change) {
+        async function updateQuantity(id, change) {
             const item = pantryItems.find(i => i.id === id);
             if (item) {
-                item.quantity = Math.max(0, item.quantity + change);
+                const newQuantity = Math.max(0, item.quantity + change);
                 
                 // If item is marked as staple and quantity reaches 0, add to Staples list
-                if (item.quantity === 0 && item.isStaple) {
-                    addToStaplesList(item);
-                    deletePantryItem(id);
-                } else if (item.quantity === 0) {
-                    deletePantryItem(id);
+                if (newQuantity === 0 && item.isStaple) {
+                    await addToStaplesList(item);
+                    await deletePantryItem(id);
+                } else if (newQuantity === 0) {
+                    await deletePantryItem(id);
                 } else {
-                    saveData();
-                    renderUI();
+                    await updatePantryItemInFirebase(id, { quantity: newQuantity });
+                    // Real-time listener will update UI automatically
                 }
             }
         }
 
-        function toggleStaple(id) {
+        async function toggleStaple(id) {
             const item = pantryItems.find(i => i.id === id);
             if (item) {
-                item.isStaple = !item.isStaple;
-                saveData();
-                renderUI();
+                await updatePantryItemInFirebase(id, { isStaple: !item.isStaple });
+                // Real-time listener will update UI automatically
             }
         }
 
-        function addToStaplesList(item) {
+        async function addToStaplesList(item) {
             // Find or create Staples shopping list
             let staplesList = shoppingLists.find(l => l.name === '⭐ Staples');
             
             if (!staplesList) {
                 staplesList = {
-                    id: Date.now(),
                     name: '⭐ Staples',
                     items: [],
                     createdAt: new Date().toISOString()
                 };
-                shoppingLists.push(staplesList);
+                const docRef = await addShoppingListToFirebase(staplesList);
+                staplesList.id = docRef.id;
             }
             
             // Add item to Staples list if not already there
             const exists = staplesList.items.find(si => si.name.toLowerCase() === item.name.toLowerCase());
             if (!exists) {
-                staplesList.items.push({
+                const newItem = {
                     id: Date.now(),
                     name: item.name,
                     quantity: 1,
                     unit: item.unit || 'unit',
                     completed: false
-                });
+                };
+                staplesList.items.push(newItem);
+                await updateShoppingListInFirebase(staplesList.id, { items: staplesList.items });
+                // Real-time listener will update UI automatically
             }
-            
-            saveData();
         }
 
         function isExpired(expiryDate) {
@@ -2923,19 +2979,20 @@
                 sourceLists: selectedListIds
             };
 
-            shoppingLists.push(newMergedList);
-            currentShoppingListId = newMergedList.id;
-            saveData();
-            renderUI();
-            
-            // Close dialog
-            const dialog = document.getElementById('mergeDialog');
-            if (dialog) dialog.remove();
-            
-            // Open the merged list
-            openShoppingListToShop(newMergedList.id);
-            
-            alert(`✅ Created merged list "${mergeName}"\n\n${mergedItemsArray.length} total items\n${selectedLists.length} lists combined\n\nItems marked with x2, x3 appear in multiple lists`);
+            // Add merged list to Firebase
+            (async () => {
+                const docRef = await addShoppingListToFirebase(newMergedList);
+                currentShoppingListId = docRef.id;
+                
+                // Close dialog
+                const dialog = document.getElementById('mergeDialog');
+                if (dialog) dialog.remove();
+                
+                // Open the merged list
+                openShoppingListToShop(docRef.id);
+                
+                alert(`✅ Created merged list "${mergeName}"\n\n${mergedItemsArray.length} total items\n${selectedLists.length} lists combined\n\nItems marked with x2, x3 appear in multiple lists`);
+            })();
         }
 
         // Toggle shopping category collapse state
@@ -3087,30 +3144,14 @@
                 createdAt: new Date().toISOString()
             };
             
-            // Try to create in backend first
-            if (useBackend && householdId) {
-                const apiList = await createShoppingListAPI(newList);
-                if (apiList) {
-                    newList.id = apiList.id;
-                    newList.items = apiList.items || [];
-                    console.log('✅ List created in backend');
-                } else {
-                    newList.id = Date.now();
-                    console.log('⚠️ Created locally (backend sync failed)');
-                }
-            } else {
-                newList.id = Date.now();
-            }
-            
-            shoppingLists.push(newList);
-            currentShoppingListId = newList.id;
-            saveData();
-            renderUI();
+            const docRef = await addShoppingListToFirebase(newList);
+            currentShoppingListId = docRef.id;
+            // Real-time listener will update UI automatically
             document.getElementById('shoppingListName').value = '';
             switchShoppingTab('add');
         }
 
-        function addItemToShoppingList() {
+        async function addItemToShoppingList() {
             if (!currentShoppingListId) {
                 alert('Please select a list first');
                 return;
@@ -3133,8 +3174,8 @@
                 };
                 
                 list.items.push(item);
-                saveData();
-                renderUI();
+                await updateShoppingListInFirebase(list.id, { items: list.items });
+                // Real-time listener will update UI automatically
                 document.getElementById('shoppingItemName').value = '';
                 document.getElementById('shoppingItemQty').value = '1';
                 renderShoppingListDetails();
@@ -3142,41 +3183,36 @@
             }
         }
 
-        function toggleShoppingItem(listId, itemId) {
+        async function toggleShoppingItem(listId, itemId) {
             const list = shoppingLists.find(l => l.id === listId);
             if (list) {
                 const item = list.items.find(i => i.id === itemId);
                 if (item) {
                     item.completed = !item.completed;
-                    saveData();
-                    renderUI();
+                    await updateShoppingListInFirebase(listId, { items: list.items });
+                    // Real-time listener will update UI automatically
                     renderShoppingListDetails();
                 }
             }
         }
 
-        function removeShoppingItem(listId, itemId) {
+        async function removeShoppingItem(listId, itemId) {
             const list = shoppingLists.find(l => l.id === listId);
             if (list) {
                 list.items = list.items.filter(i => i.id !== itemId);
-                saveData();
-                renderUI();
+                await updateShoppingListInFirebase(listId, { items: list.items });
+                // Real-time listener will update UI automatically
                 renderShoppingListDetails();
             }
         }
 
         async function deleteShoppingList(listId) {
             if (confirm('Delete this shopping list?')) {
-                // Try to delete from backend first
-                if (useBackend && householdId) {
-                    await deleteShoppingListAPI(listId);
-                }
-                shoppingLists = shoppingLists.filter(l => l.id !== listId);
+                await deleteShoppingListFromFirebase(listId);
                 if (currentShoppingListId === listId) {
                     currentShoppingListId = null;
                 }
-                saveData();
-                renderUI();
+                // Real-time listener will update UI automatically
             }
         }
 
@@ -3191,28 +3227,28 @@
             }
         }
 
-        function markShoppingDone(listId) {
+        async function markShoppingDone(listId) {
             const list = shoppingLists.find(l => l.id === listId);
             if (list) {
                 // Mark all as completed
                 list.items.forEach(i => i.completed = true);
-                saveData();
-                renderUI();
+                await updateShoppingListInFirebase(listId, { items: list.items });
+                // Real-time listener will update UI automatically
             }
         }
 
-        function renewShoppingList(listId) {
+        async function renewShoppingList(listId) {
             if (confirm('Reset all items to not completed? This will clear the shopping progress.')) {
                 const list = shoppingLists.find(l => l.id === listId);
                 if (list) {
                     list.items.forEach(i => i.completed = false);
-                    saveData();
-                    renderUI();
+                    await updateShoppingListInFirebase(listId, { items: list.items });
+                    // Real-time listener will update UI automatically
                 }
             }
         }
 
-        function toggleShoppingComplete(listId) {
+        async function toggleShoppingComplete(listId) {
             const list = shoppingLists.find(l => l.id === listId);
             if (list) {
                 const completed = list.items.filter(i => i.completed).length;
@@ -3226,8 +3262,8 @@
                     list.items.forEach(i => i.completed = true);
                 }
                 
-                saveData();
-                renderUI();
+                await updateShoppingListInFirebase(listId, { items: list.items });
+                // Real-time listener will update UI automatically
             }
         }
 
@@ -3331,8 +3367,10 @@
                 }
             });
 
-            saveData();
-            renderUI();
+            // Update shopping list in Firebase
+            (async () => {
+                await updateShoppingListInFirebase(list.id, { items: list.items });
+            })();
             
             // Auto-select the shopping list and display it
             selectShoppingList(currentShoppingListId);
