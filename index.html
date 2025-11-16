@@ -3086,14 +3086,14 @@
                         <div style="background: white; border-radius: 10px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                 <div style="font-weight: 600;">${list.name}</div>
-                                <button class="delete-btn" onclick="deleteShoppingList(${list.id})">🗑️</button>
+                                <button class="delete-btn" onclick="deleteShoppingList('${list.id}')">🗑️</button>
                             </div>
                             <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">
                                 ${total} items • ${completed} completed
                             </div>
                             <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-primary" onclick="openShoppingListToShop(${list.id})" style="flex: 1; padding: 8px; font-size: 12px;">🛒 Shop</button>
-                                ${completed === total && total > 0 ? `<button class="btn btn-secondary" onclick="renewShoppingList(${list.id})" style="flex: 1; padding: 8px; font-size: 12px;">🔄 Renew</button>` : `<button class="btn btn-secondary" onclick="markShoppingDone(${list.id})" style="flex: 1; padding: 8px; font-size: 12px;">✓ Done</button>`}
+                                <button class="btn btn-primary" onclick="openShoppingListToShop('${list.id}')" style="flex: 1; padding: 8px; font-size: 12px;">🛒 Shop</button>
+                                ${completed === total && total > 0 ? `<button class="btn btn-secondary" onclick="renewShoppingList('${list.id}')" style="flex: 1; padding: 8px; font-size: 12px;">🔄 Renew</button>` : `<button class="btn btn-secondary" onclick="markShoppingDone('${list.id}')" style="flex: 1; padding: 8px; font-size: 12px;">✓ Done</button>`}
                             </div>
                         </div>
                     `;
@@ -3280,12 +3280,12 @@
                 
                 const itemsHtml = items.map(item => `
                     <div style="background: ${item.completed ? '#f0f0f0' : '#fafbfc'}; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; margin-bottom: 6px; display: flex; gap: 10px; align-items: center;">
-                        <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleShoppingItem(${currentShoppingListId}, ${item.id})" style="width: 18px; height: 18px; cursor: pointer;">
+                        <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleShoppingItem('${currentShoppingListId}', '${item.id}')" style="width: 18px; height: 18px; cursor: pointer;">
                         <div style="flex: 1;">
                             <div style="font-weight: 500; ${item.completed ? 'text-decoration: line-through; color: #999;' : ''}">${item.name}</div>
                             <div style="font-size: 12px; color: #6b7280;">${item.quantity} ${item.unit}</div>
                         </div>
-                        <button onclick="removeShoppingItem(${currentShoppingListId}, ${item.id})" style="background: none; border: none; cursor: pointer; font-size: 18px;">🗑️</button>
+                        <button onclick="removeShoppingItem('${currentShoppingListId}', '${item.id}')" style="background: none; border: none; cursor: pointer; font-size: 18px;">🗑️</button>
                     </div>
                 `).join('');
 
@@ -3311,7 +3311,7 @@
         function renderShoppingListModal() {
             // Show list of all shopping lists to choose from
             const html = shoppingLists.map(list => `
-                <div onclick="selectShoppingList(${list.id})" style="background: ${currentShoppingListId === list.id ? '#e0e7ff' : '#f9fafb'}; border: 2px solid ${currentShoppingListId === list.id ? '#3b82f6' : '#e5e7eb'}; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: pointer;">
+                <div onclick="selectShoppingList('${list.id}')" style="background: ${currentShoppingListId === list.id ? '#e0e7ff' : '#f9fafb'}; border: 2px solid ${currentShoppingListId === list.id ? '#3b82f6' : '#e5e7eb'}; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: pointer;">
                     <div style="font-weight: 600;">${list.name}</div>
                     <div style="font-size: 12px; color: #6b7280;">${(list.items || []).length} items</div>
                 </div>
@@ -3759,7 +3759,7 @@
                     <div class="member-card">
                         <div style="display: flex; justify-content: space-between;">
                             <div class="member-name">${member.name}</div>
-                            <button class="delete-btn" onclick="deleteMember(${member.id})">🗑️</button>
+                            <button class="delete-btn" onclick="deleteMember('${member.id}')">🗑️</button>
                         </div>
                         <div class="member-info">
                             ${member.age ? `<div>🎂 Age: ${member.age}</div>` : ''}
