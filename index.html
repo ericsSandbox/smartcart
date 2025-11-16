@@ -996,15 +996,11 @@
             
             <!-- Quick Add Item -->
             <div style="background: #f0f9ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-                <div style="display: flex; gap: 8px; align-items: flex-end;">
-                    <div style="flex: 1;">
-                        <input type="text" id="quickAddItemName" placeholder="Add item..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;" />
-                    </div>
-                    <div style="width: 80px;">
-                        <input type="number" id="quickAddItemQty" value="1" min="0.1" step="0.1" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;" />
-                    </div>
-                    <div style="width: 90px;">
-                        <select id="quickAddItemUnit" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <input type="text" id="quickAddItemName" placeholder="What do you need?" style="width: 100%; padding: 12px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 16px;" />
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="number" id="quickAddItemQty" value="1" min="0.1" step="0.1" style="width: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" />
+                        <select id="quickAddItemUnit" style="width: 100px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
                             <option>unit</option>
                             <option>lb</option>
                             <option>oz</option>
@@ -1012,8 +1008,8 @@
                             <option>ml</option>
                             <option>piece</option>
                         </select>
+                        <button class="btn btn-primary" onclick="quickAddItem()" style="flex: 1; padding: 10px 16px; white-space: nowrap; font-size: 16px;">➕ Add Item</button>
                     </div>
-                    <button class="btn btn-primary" onclick="quickAddItem()" style="padding: 8px 16px; white-space: nowrap;">➕ Add</button>
                 </div>
             </div>
 
@@ -3533,10 +3529,17 @@
                 
                 list.items.push(item);
                 await updateShoppingListInFirebase(list.id, { items: list.items });
-                // Real-time listener will update UI automatically
+                
+                // Immediately update UI for instant feedback
+                renderShoppingListDetails();
+                
+                // Clear form
                 document.getElementById('quickAddItemName').value = '';
                 document.getElementById('quickAddItemQty').value = '1';
                 document.getElementById('quickAddItemUnit').value = 'unit';
+                
+                // Refocus on name input for quick multiple adds
+                document.getElementById('quickAddItemName').focus();
             }
         }
 
@@ -3550,7 +3553,55 @@
             if (list) {
                 const item = list.items.find(i => i.id === itemId);
                 if (item) {
+                    const wasCompleted = item.completed;
                     item.completed = !item.completed;
+                    
+                    // If marking as completed (shopped), add to pantry
+                    if (item.completed && !wasCompleted) {
+                        // Check if item already exists in pantry
+                        const existingPantryItem = pantryItems.find(p => 
+                            p.name.toLowerCase() === item.name.toLowerCase()
+                        );
+                        
+                        if (existingPantryItem) {
+                            // Item exists, increase quantity
+                            await updatePantryItemInFirebase(existingPantryItem.id, {
+                                quantity: existingPantryItem.quantity + item.quantity
+                            });
+                        } else {
+                            // Add new item to pantry
+                            const pantryItem = {
+                                name: item.name,
+                                quantity: item.quantity,
+                                unit: item.unit,
+                                category: autoCategorizePantryItem(item.name),
+                                isStaple: false,
+                                expires_at: null
+                            };
+                            await addPantryItemToFirebase(pantryItem);
+                        }
+                    }
+                    
+                    // If unmarking (unchecking), remove from pantry
+                    if (!item.completed && wasCompleted) {
+                        const existingPantryItem = pantryItems.find(p => 
+                            p.name.toLowerCase() === item.name.toLowerCase()
+                        );
+                        
+                        if (existingPantryItem) {
+                            // Check if we should decrease quantity or remove entirely
+                            if (existingPantryItem.quantity > item.quantity) {
+                                // Decrease quantity
+                                await updatePantryItemInFirebase(existingPantryItem.id, {
+                                    quantity: existingPantryItem.quantity - item.quantity
+                                });
+                            } else {
+                                // Remove from pantry entirely
+                                await deletePantryItemFromFirebase(existingPantryItem.id);
+                            }
+                        }
+                    }
+                    
                     await updateShoppingListInFirebase(listId, { items: list.items });
                     // Real-time listener will update UI automatically
                     renderShoppingListDetails();
