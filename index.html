@@ -3164,7 +3164,18 @@
         function renderShopping() {
             const search = document.getElementById('shoppingSearch').value.toLowerCase();
             console.log('🔍 Shopping search:', search);
-            let filtered = shoppingLists.filter(l => l.name.toLowerCase().includes(search));
+            
+            // Filter by list name OR items within the list
+            let filtered = shoppingLists.filter(l => {
+                // Check if list name matches
+                if (l.name.toLowerCase().includes(search)) {
+                    return true;
+                }
+                // Check if any item in the list matches
+                const items = l.items || [];
+                return items.some(item => item.name.toLowerCase().includes(search));
+            });
+            
             console.log('✅ Filtered lists:', filtered.length, 'of', shoppingLists.length);
 
             // Sort: Staples first, then alphabetically
