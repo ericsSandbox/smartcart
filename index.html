@@ -692,36 +692,28 @@
 
     <div class="container">
         <div class="tab-content active" id="pantry">
-            <div class="stats">
-                <div class="stat-card">
-                    <div class="number" id="totalCount">0</div>
-                    <div class="label">Items</div>
-                </div>
-                <div class="stat-card">
-                    <div class="number" id="lowStockCount">0</div>
-                    <div class="label">Low Stock</div>
-                </div>
-                <div class="stat-card">
-                    <div class="number" id="expiredCount">0</div>
-                    <div class="label">Expiring</div>
-                </div>
-            </div>
-
-            <div id="warningBanner"></div>
-
             <div class="search-box">
                 <input type="search" id="searchInput" placeholder="🔍 Search pantry..." />
             </div>
 
-            <div style="display: flex; gap: 8px; padding: 12px; background: #f0f9ff; border-radius: 8px; margin: 12px 12px 0 12px; flex-wrap: wrap;">
-                <button class="btn btn-primary" onclick="togglePantryView()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;" id="viewToggleBtn">📂 View: Categories</button>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <div style="flex: 1; background: #f0f9ff; border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 24px; font-weight: 600; color: #1f2937;" id="totalCount">0</div>
+                    <div style="font-size: 13px; color: #6b7280;">Total Items</div>
+                </div>
+                <div style="flex: 1; background: #fef3c7; border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 24px; font-weight: 600; color: #1f2937;" id="expiredCount">0</div>
+                    <div style="font-size: 13px; color: #6b7280;">Expiring Soon</div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 8px; padding: 12px; background: #f0f9ff; border-radius: 8px; margin-bottom: 16px; flex-wrap: wrap;">
                 <button class="btn btn-primary" onclick="showDataStats()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">📊 Stats</button>
                 <button class="btn btn-secondary" onclick="exportDataAsJSON()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">💾 Backup</button>
                 <button class="btn btn-secondary" onclick="exportDataAsCSV()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">📥 Export CSV</button>
                 <button class="btn btn-secondary" onclick="importDataFromJSON()" style="flex: 1; padding: 8px; font-size: 12px; min-width: 80px;">⬆️ Restore</button>
             </div>
 
-            <div class="section-title">Pantry Items</div>
             <div class="item-list" id="itemList"></div>
             <div class="empty-state" id="emptyState">
                 <div class="icon">🧭</div>
@@ -883,6 +875,59 @@
                         <option value="">📷 Select Camera</option>
                     </select>
                     <button type="button" class="close" onclick="closeCameraScanner()">✕ Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="editPantryItemModal">
+        <div class="modal-content">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span id="editItemName" style="font-size: 18px; font-weight: 600;"></span>
+                <button class="btn btn-secondary" onclick="closeEditPantryModal()" style="padding: 6px 12px; font-size: 12px;">✕ Close</button>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- Quantity Control -->
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151;">Quantity</label>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <button class="qty-btn" onclick="adjustEditQuantity(-1)" style="width: 40px; height: 40px; font-size: 20px;">−</button>
+                        <input type="number" id="editItemQty" min="0.1" step="0.1" style="flex: 1; padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 16px; text-align: center; font-weight: 600;" />
+                        <button class="qty-btn" onclick="adjustEditQuantity(1)" style="width: 40px; height: 40px; font-size: 20px;">+</button>
+                        <select id="editItemUnit" style="padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 14px;">
+                            <option>unit</option>
+                            <option>lb</option>
+                            <option>oz</option>
+                            <option>cup</option>
+                            <option>ml</option>
+                            <option>piece</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Expiration Date -->
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151;">Expiration Date</label>
+                    <input type="date" id="editItemExpires" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px;" />
+                </div>
+                
+                <!-- Staple Status -->
+                <div>
+                    <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 12px; background: #f9fafb; border-radius: 8px; border: 2px solid #e5e7eb;">
+                        <input type="checkbox" id="editItemStaple" style="width: 20px; height: 20px; cursor: pointer;" />
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #374151;">⭐ Mark as Staple</div>
+                            <div style="font-size: 12px; color: #6b7280;">Staple items are highlighted and easily identified</div>
+                        </div>
+                    </label>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button class="btn btn-secondary" onclick="closeEditPantryModal()" style="flex: 1;">Cancel</button>
+                    <button class="btn btn-danger" onclick="deleteFromEdit()" style="flex: 1; background: #ef4444;">🗑️ Delete</button>
+                    <button class="btn btn-primary" onclick="saveEditPantryItem()" style="flex: 2;">💾 Save Changes</button>
                 </div>
             </div>
         </div>
@@ -2643,6 +2688,63 @@
             }
         }
 
+        let currentEditItemId = null;
+
+        function openEditPantryModal(itemId) {
+            const item = pantryItems.find(i => i.id === itemId);
+            if (!item) return;
+            
+            currentEditItemId = itemId;
+            document.getElementById('editItemName').textContent = item.name;
+            document.getElementById('editItemQty').value = item.quantity || 1;
+            document.getElementById('editItemUnit').value = item.unit || 'unit';
+            document.getElementById('editItemExpires').value = item.expires_at || '';
+            document.getElementById('editItemStaple').checked = item.isStaple || false;
+            
+            document.getElementById('editPantryItemModal').classList.add('active');
+        }
+
+        function closeEditPantryModal() {
+            document.getElementById('editPantryItemModal').classList.remove('active');
+            currentEditItemId = null;
+        }
+
+        function adjustEditQuantity(change) {
+            const input = document.getElementById('editItemQty');
+            const currentValue = parseFloat(input.value) || 1;
+            const newValue = Math.max(0.1, currentValue + change);
+            input.value = newValue;
+        }
+
+        async function saveEditPantryItem() {
+            if (!currentEditItemId) return;
+            
+            const quantity = parseFloat(document.getElementById('editItemQty').value);
+            const unit = document.getElementById('editItemUnit').value;
+            const expires_at = document.getElementById('editItemExpires').value;
+            const isStaple = document.getElementById('editItemStaple').checked;
+            
+            await updatePantryItemInFirebase(currentEditItemId, {
+                quantity,
+                unit,
+                expires_at: expires_at || null,
+                isStaple
+            });
+            
+            closeEditPantryModal();
+            // Real-time listener will update UI automatically
+        }
+
+        async function deleteFromEdit() {
+            if (!currentEditItemId) return;
+            
+            if (confirm('Delete this item from your pantry?')) {
+                await deletePantryItemFromFirebase(currentEditItemId);
+                closeEditPantryModal();
+                // Real-time listener will update UI automatically
+            }
+        }
+
         async function addToStaplesList(item) {
             // Find or create Staples shopping list
             let staplesList = shoppingLists.find(l => l.name === '⭐ Staples');
@@ -2826,21 +2928,10 @@
                 }
             });
             
-            const lowStock = pantryItems.filter(i => i.quantity <= 1).length;
             const expired = pantryItems.filter(i => isExpired(i.expires_at)).length;
 
             document.getElementById('totalCount').textContent = pantryItems.length;
-            document.getElementById('lowStockCount').textContent = lowStock;
             document.getElementById('expiredCount').textContent = expired;
-
-            if (expired > 0 || lowStock > 0) {
-                document.getElementById('warningBanner').innerHTML = `
-                    ${expired > 0 ? `<div class="warning-banner danger">⚠️ ${expired} expired/expiring</div>` : ''}
-                    ${lowStock > 0 ? `<div class="warning-banner">ℹ️ ${lowStock} low stock</div>` : ''}
-                `;
-            } else {
-                document.getElementById('warningBanner').innerHTML = '';
-            }
 
             if (Object.keys(filteredGrouped).length === 0) {
                 document.getElementById('emptyState').style.display = 'block';
@@ -2851,6 +2942,16 @@
                 // Sort categories in display order
                 const categoryOrder = ['Proteins', 'Vegetables', 'Spices', 'Condiments', 'Oils & Vinegars', 'Grains & Pasta', 'Baking', 'Frozen', 'Bakery', 'Dairy & Cheese', 'Pantry', 'Household'];
                 const sortedCategories = categoryOrder.filter(cat => filteredGrouped[cat]);
+                
+                // Alternating tile colors
+                const tileColors = [
+                    '#e0f2fe', // light blue
+                    '#f0fdf4', // light green
+                    '#fef3c7', // light yellow
+                    '#ffe4e6', // light pink
+                    '#f3e8ff', // light purple
+                    '#e5e7eb'  // light gray
+                ];
                 
                 const html = sortedCategories.map(cat => {
                     const items = filteredGrouped[cat];
@@ -2874,42 +2975,36 @@
                     const isCollapsed = localStorage.getItem(collapseKey) === 'true';
                     
                     return `
-                        <div class="category-section">
-                            <div class="category-header" onclick="window.toggleCategoryCollapse('${cat}')" style="cursor: pointer; user-select: none;">
-                                <span style="display: flex; align-items: center; gap: 8px; flex: 1;">
-                                    <span style="display: inline-block; width: 12px; text-align: center;">
-                                        ${isCollapsed ? '▶' : '▼'}
-                                    </span>
-                                    <span>${categoryEmojis[cat] || '📂'} ${cat}</span>
+                        <div style="margin-bottom: 16px;">
+                            <div onclick="window.toggleCategoryCollapse('${cat}')" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #f3f4f6; border-radius: 8px; font-weight: 600; margin-bottom: 12px;">
+                                <span style="font-size: 14px;">
+                                    ${isCollapsed ? '▶' : '▼'}
                                 </span>
-                                <span class="category-count">${items.length}</span>
+                                <span style="flex: 1;">${categoryEmojis[cat] || '📂'} ${cat}</span>
+                                <span style="background: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; color: #6b7280;">${items.length}</span>
                             </div>
-                            <div class="category-items" id="category-${cat.replace(/\s+/g, '-')}" style="display: ${isCollapsed ? 'none' : 'flex'}; ${isCollapsed ? 'overflow: hidden;' : ''}">
-                                ${items.map(item => {
+                            <div id="category-${cat.replace(/\s+/g, '-')}" style="display: ${isCollapsed ? 'none' : 'grid'}; grid-template-columns: repeat(2, 1fr); gap: 12px; ${isCollapsed ? 'overflow: hidden;' : ''}">
+                                ${items.map((item, index) => {
                                     const expired = isExpired(item.expires_at);
                                     const expiresIn = getExpiresIn(item.expires_at);
-                                    let cardClass = 'item-card';
-                                    if (expired) cardClass += ' expired';
-                                    else if (item.quantity <= 1) cardClass += ' low-stock';
+                                    const bgColor = expired ? '#fee2e2' : tileColors[index % tileColors.length];
 
                                     return `
-                                        <div class="${cardClass}">
-                                            <div class="item-info">
-                                                <div class="item-name">
-                                                    ${item.name}
-                                                    ${item.isStaple ? '<span style="margin-left: 8px; background: #fbbf24; color: #78350f; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">⭐ STAPLE</span>' : ''}
-                                                </div>
-                                                <div class="item-meta">
-                                                    <span>📦 ${item.quantity} ${item.unit}</span>
-                                                    ${expiresIn ? `<span>${expiresIn}</span>` : ''}
-                                                </div>
-                                            </div>
-                                            <div class="item-qty">
-                                                <button class="qty-btn" onclick="updateQuantity('${item.id}', -1)">−</button>
-                                                <div class="qty-display">${item.quantity}</div>
-                                                <button class="qty-btn" onclick="updateQuantity('${item.id}', 1)">+</button>
-                                                <button class="qty-btn" onclick="toggleStaple('${item.id}')" style="background: ${item.isStaple ? '#fbbf24' : '#e5e7eb'}; color: ${item.isStaple ? '#78350f' : '#6b7280'}; font-weight: bold;">⭐</button>
-                                                <button class="delete-btn" onclick="deletePantryItem('${item.id}')">🗑️</button>
+                                        <div onclick="openEditPantryModal('${item.id}')" style="
+                                            background: ${bgColor};
+                                            border-radius: 12px;
+                                            padding: 16px;
+                                            cursor: pointer;
+                                            transition: transform 0.2s, box-shadow 0.2s;
+                                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                            position: relative;
+                                            ${expired ? 'border: 2px solid #ef4444;' : ''}
+                                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)';">
+                                            ${item.isStaple ? '<div style="position: absolute; top: 8px; right: 8px; font-size: 16px;">⭐</div>' : ''}
+                                            <div style="font-weight: 600; font-size: 15px; color: #1f2937; margin-bottom: 8px; ${item.isStaple ? 'padding-right: 24px;' : ''}">${item.name}</div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #6b7280;">
+                                                <span>📦 ${item.quantity} ${item.unit}</span>
+                                                ${expiresIn ? `<span style="font-size: 11px; ${expired ? 'color: #ef4444; font-weight: 600;' : ''}">${expiresIn}</span>` : ''}
                                             </div>
                                         </div>
                                     `;
