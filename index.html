@@ -2941,6 +2941,7 @@
 
         function renderPantryByCategory() {
             const search = document.getElementById('searchInput').value.toLowerCase();
+            console.log('🔍 Pantry search:', search);
             
             // Auto-categorize any items missing categories
             migratePantryToCategories();
@@ -2961,6 +2962,8 @@
                     filteredGrouped[cat] = filtered;
                 }
             });
+            
+            console.log('✅ Filtered items:', Object.values(filteredGrouped).flat().length, 'of', pantryItems.length);
             
             const expired = pantryItems.filter(i => isExpired(i.expires_at)).length;
 
@@ -3169,7 +3172,9 @@
 
         function renderShopping() {
             const search = document.getElementById('shoppingSearch').value.toLowerCase();
+            console.log('🔍 Shopping search:', search);
             let filtered = shoppingLists.filter(l => l.name.toLowerCase().includes(search));
+            console.log('✅ Filtered lists:', filtered.length, 'of', shoppingLists.length);
 
             // Sort: Staples first, then alphabetically
             filtered.sort((a, b) => {
