@@ -734,12 +734,12 @@
                 <input type="search" id="shoppingSearch" placeholder="🔍 Search lists..." />
             </div>
 
-            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                <button class="btn btn-primary" onclick="mergeShoppingLists()" style="flex: 1; padding: 8px; font-size: 12px;">🔀 Merge Lists</button>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <button class="btn btn-primary" onclick="createNewShoppingList()" style="flex: 1; padding: 10px; font-size: 14px;">➕ New List</button>
+                <button class="btn btn-secondary" onclick="mergeShoppingLists()" style="flex: 1; padding: 10px; font-size: 14px;">🔀 Merge</button>
             </div>
 
-            <div class="section-title">Shopping Lists</div>
-            <div id="shoppingLists" class="item-list"></div>
+            <div id="shoppingLists" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;"></div>
             <div class="empty-state" id="emptyShoppingState">
                 <div class="icon">📋</div>
                 <p>No shopping lists. Create one!</p>
@@ -930,80 +930,39 @@
 
     <div class="modal" id="shoppingListModal">
         <div class="modal-content">
-            <div class="modal-header">Shopping List</div>
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span id="currentListName" style="font-size: 18px; font-weight: 600;">Shopping List</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-secondary" onclick="deleteShoppingList(currentShoppingListId)" style="padding: 6px 12px; font-size: 12px;">🗑️ Delete</button>
+                    <button class="btn btn-secondary" onclick="closeShoppingListModal()" style="padding: 6px 12px; font-size: 12px;">✕ Close</button>
+                </div>
+            </div>
             
-            <div class="tabs-inline" id="shoppingTabs">
-                <button class="tab-toggle active" data-form="view">📋 View List</button>
-                <button class="tab-toggle" data-form="add">➕ Add Items</button>
-                <button class="tab-toggle" data-form="import">📝 Import</button>
-                <button class="tab-toggle" data-form="recipes">🍳 Find Recipes</button>
-            </div>
-
-            <!-- View/Edit Shopping List -->
-            <div class="form-section active" data-form="view">
-                <div id="shoppingListItems" style="max-height: 400px; overflow-y: auto; margin-bottom: 16px;"></div>
-                <input type="text" id="shoppingListName" placeholder="List name..." style="width: 100%; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                <div class="button-group">
-                    <button type="button" class="btn btn-secondary" id="cancelShoppingBtn">Cancel</button>
-                    <button type="button" class="btn btn-success" onclick="createNewShoppingList()">Create New</button>
-                </div>
-            </div>
-
-            <!-- Add Items to List -->
-            <div class="form-section" data-form="add">
-                <label>Add to: <strong id="currentListName"></strong></label>
-                
-                <!-- Preview of existing items -->
-                <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin-bottom: 12px; max-height: 200px; overflow-y: auto;">
-                    <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px; color: #374151;">
-                        Items already in list:
+            <!-- Quick Add Item -->
+            <div style="background: #f0f9ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                <div style="display: flex; gap: 8px; align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <input type="text" id="quickAddItemName" placeholder="Add item..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;" />
                     </div>
-                    <div id="shoppingAddItemsPreview" style="font-size: 12px; color: #6b7280;">
-                        <div style="padding: 8px; color: #999; font-style: italic;">Loading...</div>
+                    <div style="width: 80px;">
+                        <input type="number" id="quickAddItemQty" value="1" min="0.1" step="0.1" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;" />
                     </div>
-                </div>
-
-                <input type="text" id="shoppingItemName" placeholder="Item name..." />
-                <input type="number" id="shoppingItemQty" placeholder="Quantity" value="1" min="0.1" step="0.1" />
-                <select id="shoppingItemUnit">
-                    <option>unit</option>
-                    <option>lb</option>
-                    <option>oz</option>
-                    <option>cup</option>
-                    <option>ml</option>
-                    <option>piece</option>
-                </select>
-                <div class="button-group">
-                    <button type="button" class="btn btn-secondary" onclick="switchShoppingTab('view')">Back</button>
-                    <button type="button" class="btn btn-primary" onclick="addItemToShoppingList()">Add Item</button>
+                    <div style="width: 90px;">
+                        <select id="quickAddItemUnit" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                            <option>unit</option>
+                            <option>lb</option>
+                            <option>oz</option>
+                            <option>cup</option>
+                            <option>ml</option>
+                            <option>piece</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="quickAddItem()" style="padding: 8px 16px; white-space: nowrap;">➕ Add</button>
                 </div>
             </div>
 
-            <!-- Import Ingredients -->
-            <div class="form-section" data-form="import">
-                <label>Paste Ingredient List:</label>
-                <textarea id="ingredientPasteArea" placeholder="Paste ingredients here, one per line:&#10;10 oz rice noodles&#10;1 lb ground beef&#10;soy sauce&#10;sugar&#10;salt&#10;pepper&#10;garlic&#10;green onions" style="width: 100%; height: 180px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 12px; margin-bottom: 12px; resize: vertical;"></textarea>
-                <div style="font-size: 12px; color: #6b7280; margin-bottom: 12px; line-height: 1.5;">
-                    💡 Paste ingredients with or without quantities:<br>
-                    • "10 oz rice noodles" → 10, oz<br>
-                    • "1 lb beef" → 1, lb<br>
-                    • "soy sauce" → 1, unit
-                </div>
-                <div class="button-group">
-                    <button type="button" class="btn btn-secondary" onclick="switchShoppingTab('view')">Back</button>
-                    <button type="button" class="btn btn-primary" onclick="importIngredients()">Import All</button>
-                </div>
-            </div>
-
-            <!-- Recipe Search -->
-            <div class="form-section" data-form="recipes">
-                <input type="text" id="recipeSearch" placeholder="Search recipes (e.g., 'pasta', 'chicken')..." />
-                <button type="button" class="btn btn-primary" onclick="searchRecipes()" style="width: 100%; margin-top: 10px;">🔍 Search</button>
-                <div id="recipeResults" style="max-height: 350px; overflow-y: auto; margin-top: 12px;"></div>
-                <div class="button-group" style="margin-top: 16px;">
-                    <button type="button" class="btn btn-secondary" onclick="switchShoppingTab('view')">Back</button>
-                </div>
-            </div>
+            <!-- Shopping List Items -->
+            <div id="shoppingListItems" style="max-height: 500px; overflow-y: auto; margin-bottom: 16px;"></div>
         </div>
     </div>
 
@@ -1647,6 +1606,15 @@
 
             document.getElementById('shoppingSearch').addEventListener('input', () => {
                 renderShopping();
+            });
+
+            // Quick add item with Enter key
+            document.addEventListener('keypress', (e) => {
+                const quickAddInput = document.getElementById('quickAddItemName');
+                if (e.key === 'Enter' && document.activeElement === quickAddInput) {
+                    e.preventDefault();
+                    quickAddItem();
+                }
             });
 
             document.querySelectorAll('.modal').forEach(modal => {
@@ -3072,28 +3040,55 @@
 
         function renderShopping() {
             const search = document.getElementById('shoppingSearch').value.toLowerCase();
-            const filtered = shoppingLists.filter(l => l.name.toLowerCase().includes(search));
+            let filtered = shoppingLists.filter(l => l.name.toLowerCase().includes(search));
+
+            // Sort: Staples first, then alphabetically
+            filtered.sort((a, b) => {
+                const aIsStaples = a.name.toLowerCase().includes('staple');
+                const bIsStaples = b.name.toLowerCase().includes('staple');
+                
+                if (aIsStaples && !bIsStaples) return -1;
+                if (!aIsStaples && bIsStaples) return 1;
+                return a.name.localeCompare(b.name);
+            });
 
             if (filtered.length === 0) {
                 document.getElementById('emptyShoppingState').style.display = 'block';
                 document.getElementById('shoppingLists').innerHTML = '';
             } else {
                 document.getElementById('emptyShoppingState').style.display = 'none';
-                document.getElementById('shoppingLists').innerHTML = filtered.map(list => {
-                    const completed = (list.items || []).filter(i => i.completed).length;
+                
+                // Alternating colors
+                const colors = [
+                    '#e0f2fe', // light blue
+                    '#f0fdf4', // light green
+                    '#fef3c7', // light yellow
+                    '#ffe4e6', // light pink
+                    '#f3e8ff', // light purple
+                    '#e5e7eb'  // light gray
+                ];
+                
+                document.getElementById('shoppingLists').innerHTML = filtered.map((list, index) => {
+                    const bgColor = colors[index % colors.length];
                     const total = (list.items || []).length;
+                    const completed = (list.items || []).filter(i => i.completed).length;
+                    const isStaples = list.name.toLowerCase().includes('staple');
+                    
                     return `
-                        <div style="background: white; border-radius: 10px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                <div style="font-weight: 600;">${list.name}</div>
-                                <button class="delete-btn" onclick="deleteShoppingList('${list.id}')">🗑️</button>
-                            </div>
-                            <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">
-                                ${total} items • ${completed} completed
-                            </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-primary" onclick="openShoppingListToShop('${list.id}')" style="flex: 1; padding: 8px; font-size: 12px;">🛒 Shop</button>
-                                ${completed === total && total > 0 ? `<button class="btn btn-secondary" onclick="renewShoppingList('${list.id}')" style="flex: 1; padding: 8px; font-size: 12px;">🔄 Renew</button>` : `<button class="btn btn-secondary" onclick="markShoppingDone('${list.id}')" style="flex: 1; padding: 8px; font-size: 12px;">✓ Done</button>`}
+                        <div onclick="openShoppingListToShop('${list.id}')" style="
+                            background: ${bgColor};
+                            border-radius: 12px;
+                            padding: 16px;
+                            cursor: pointer;
+                            transition: transform 0.2s, box-shadow 0.2s;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                            position: relative;
+                            ${isStaples ? 'border: 3px solid #3b82f6;' : ''}
+                        " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)';">
+                            ${isStaples ? '<div style="position: absolute; top: 8px; right: 8px; background: #3b82f6; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600;">⭐ STAPLES</div>' : ''}
+                            <div style="font-weight: 600; font-size: 16px; color: #1f2937; margin-bottom: 8px; ${isStaples ? 'margin-top: 20px;' : ''}">${list.name}</div>
+                            <div style="font-size: 13px; color: #6b7280;">
+                                ${total > 0 ? `${completed}/${total} completed` : 'Empty list'}
                             </div>
                         </div>
                     `;
@@ -3250,60 +3245,26 @@
             const list = shoppingLists.find(l => l.id === currentShoppingListId);
             if (!list) return;
 
-            // Group items by category
-            const itemsByCategory = {};
-            const categories = ['Proteins', 'Vegetables', 'Spices', 'Condiments', 'Oils & Vinegars', 'Grains & Pasta', 'Baking', 'Frozen', 'Bakery', 'Dairy & Cheese', 'Pantry', 'Household'];
+            const items = list.items || [];
             
-            // Initialize categories
-            categories.forEach(cat => {
-                itemsByCategory[cat] = [];
-            });
+            if (items.length === 0) {
+                document.getElementById('shoppingListItems').innerHTML = '<div style="text-align: center; color: #999; padding: 40px; font-style: italic;">No items yet. Add your first item above!</div>';
+                return;
+            }
 
-            // Categorize items
-            (list.items || []).forEach(item => {
-                const category = autoCategorizePantryItem(item.name);
-                if (!itemsByCategory[category]) {
-                    itemsByCategory[category] = [];
-                }
-                itemsByCategory[category].push(item);
-            });
-
-            // Sort categories to remove empty ones
-            const activeCategories = categories.filter(cat => itemsByCategory[cat].length > 0);
-
-            // Render categories with collapsible sections
-            const categoriesHtml = activeCategories.map(cat => {
-                const items = itemsByCategory[cat];
-                const collapseKey = 'shoppingCollapse_' + cat;
-                const isCollapsed = localStorage.getItem(collapseKey) === 'true';
-                const categoryId = 'shoppingcategory-' + cat.replace(/\s+/g, '-');
-                
-                const itemsHtml = items.map(item => `
-                    <div style="background: ${item.completed ? '#f0f0f0' : '#fafbfc'}; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; margin-bottom: 6px; display: flex; gap: 10px; align-items: center;">
-                        <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleShoppingItem('${currentShoppingListId}', '${item.id}')" style="width: 18px; height: 18px; cursor: pointer;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 500; ${item.completed ? 'text-decoration: line-through; color: #999;' : ''}">${item.name}</div>
-                            <div style="font-size: 12px; color: #6b7280;">${item.quantity} ${item.unit}</div>
-                        </div>
-                        <button onclick="removeShoppingItem('${currentShoppingListId}', '${item.id}')" style="background: none; border: none; cursor: pointer; font-size: 18px;">🗑️</button>
+            // Render items in a simple list
+            const itemsHtml = items.map(item => `
+                <div style="background: ${item.completed ? '#f0f9ff' : 'white'}; border: 2px solid ${item.completed ? '#3b82f6' : '#e5e7eb'}; border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; gap: 12px; align-items: center; transition: all 0.2s;">
+                    <input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleShoppingItem('${currentShoppingListId}', '${item.id}')" style="width: 20px; height: 20px; cursor: pointer;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 500; font-size: 15px; ${item.completed ? 'text-decoration: line-through; color: #6b7280;' : 'color: #1f2937;'}">${item.name}</div>
+                        <div style="font-size: 13px; color: #9ca3af;">${item.quantity} ${item.unit}</div>
                     </div>
-                `).join('');
+                    <button onclick="removeShoppingItem('${currentShoppingListId}', '${item.id}')" style="background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 16px; transition: all 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">🗑️</button>
+                </div>
+            `).join('');
 
-                return `
-                    <div id="${categoryId}" style="margin-bottom: 12px;">
-                        <div onclick="window.toggleShoppingCategoryCollapse('${cat}')" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f3f4f6; border-radius: 6px; font-weight: 600; user-select: none; margin-bottom: 8px;">
-                            <span style="font-size: 14px;">${isCollapsed ? '▶' : '▼'}</span>
-                            <span>${cat}</span>
-                            <span style="font-size: 12px; color: #6b7280; margin-left: auto;">${items.length} items</span>
-                        </div>
-                        <div style="display: ${isCollapsed ? 'none' : 'flex'}; flex-direction: column;">
-                            ${itemsHtml}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            document.getElementById('shoppingListItems').innerHTML = categoriesHtml || '<div style="text-align: center; color: #999; padding: 20px;">No items yet.</div>';
+            document.getElementById('shoppingListItems').innerHTML = itemsHtml;
         }
 
         let currentShoppingListId = null;
@@ -3372,23 +3333,19 @@
         }
 
         async function createNewShoppingList() {
-            const name = document.getElementById('shoppingListName').value.trim();
-            if (!name) {
-                alert('Please enter a list name');
+            const name = prompt('Enter a name for your new shopping list:');
+            if (!name || !name.trim()) {
                 return;
             }
             
             const newList = {
-                name: name,
+                name: name.trim(),
                 items: [],
                 createdAt: new Date().toISOString()
             };
             
-            const docRef = await addShoppingListToFirebase(newList);
-            currentShoppingListId = docRef.id;
+            await addShoppingListToFirebase(newList);
             // Real-time listener will update UI automatically
-            document.getElementById('shoppingListName').value = '';
-            switchShoppingTab('add');
         }
 
         async function addItemToShoppingList() {
@@ -3421,6 +3378,42 @@
                 renderShoppingListDetails();
                 renderShoppingAddItemsPreview();  // Update preview after adding
             }
+        }
+
+        async function quickAddItem() {
+            if (!currentShoppingListId) {
+                alert('Please select a list first');
+                return;
+            }
+
+            const name = document.getElementById('quickAddItemName').value.trim();
+            if (!name) {
+                alert('Please enter an item name');
+                return;
+            }
+
+            const list = shoppingLists.find(l => l.id === currentShoppingListId);
+            if (list) {
+                const item = {
+                    id: Date.now(),
+                    name: name,
+                    quantity: parseFloat(document.getElementById('quickAddItemQty').value || 1),
+                    unit: document.getElementById('quickAddItemUnit').value,
+                    completed: false
+                };
+                
+                list.items.push(item);
+                await updateShoppingListInFirebase(list.id, { items: list.items });
+                // Real-time listener will update UI automatically
+                document.getElementById('quickAddItemName').value = '';
+                document.getElementById('quickAddItemQty').value = '1';
+                document.getElementById('quickAddItemUnit').value = 'unit';
+            }
+        }
+
+        function closeShoppingListModal() {
+            document.getElementById('shoppingListModal').classList.remove('active');
+            currentShoppingListId = null;
         }
 
         async function toggleShoppingItem(listId, itemId) {
@@ -3462,8 +3455,11 @@
             if (list) {
                 document.getElementById('currentListName').textContent = list.name;
                 document.getElementById('shoppingListModal').classList.add('active');
-                switchShoppingTab('view');
                 renderShoppingListDetails();
+                // Clear quick add form
+                document.getElementById('quickAddItemName').value = '';
+                document.getElementById('quickAddItemQty').value = '1';
+                document.getElementById('quickAddItemUnit').value = 'unit';
             }
         }
 
