@@ -748,6 +748,38 @@
 
         <div class="tab-content" id="members">
             <div class="section-title">Household Members</div>
+            
+            <!-- Household ID Sharing Section -->
+            <div style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                    🔗 Share Household Access
+                </div>
+                <div style="font-size: 13px; color: #1e40af; margin-bottom: 12px;">
+                    Family members need this ID to see shared data:
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" id="householdIdDisplay" readonly 
+                           style="flex: 1; padding: 10px; border: 1px solid #93c5fd; border-radius: 6px; background: white; font-family: monospace; font-size: 13px;">
+                    <button onclick="copyHouseholdId()" 
+                            style="padding: 10px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                        📋 Copy
+                    </button>
+                </div>
+                <details style="margin-top: 12px;">
+                    <summary style="cursor: pointer; color: #1e40af; font-size: 13px; font-weight: 500;">
+                        Join a different household
+                    </summary>
+                    <div style="margin-top: 12px;">
+                        <input type="text" id="joinHouseholdInput" placeholder="Paste household ID here"
+                               style="width: 100%; padding: 10px; border: 1px solid #93c5fd; border-radius: 6px; margin-bottom: 8px; font-family: monospace; font-size: 13px;">
+                        <button onclick="joinHousehold()" 
+                                style="width: 100%; padding: 10px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                            Join Household
+                        </button>
+                    </div>
+                </details>
+            </div>
+            
             <div id="membersList"></div>
             <div class="empty-state" id="emptyMembersState">
                 <div class="icon">👥</div>
@@ -2406,6 +2438,47 @@
             document.getElementById('addMemberModal').classList.remove('active');
         }
 
+        // Household ID sharing functions
+        function copyHouseholdId() {
+            const idInput = document.getElementById('householdIdDisplay');
+            idInput.select();
+            navigator.clipboard.writeText(householdId).then(() => {
+                alert('✅ Household ID copied!\n\nShare this with family members so they can access the same pantry.');
+            }).catch(err => {
+                // Fallback for older browsers
+                idInput.select();
+                document.execCommand('copy');
+                alert('✅ Household ID copied!\n\nShare this with family members so they can access the same pantry.');
+            });
+        }
+
+        function joinHousehold() {
+            const newHouseholdId = document.getElementById('joinHouseholdInput').value.trim();
+            if (!newHouseholdId) {
+                alert('⚠️ Please enter a household ID');
+                return;
+            }
+            
+            if (!newHouseholdId.startsWith('household_')) {
+                alert('⚠️ Invalid household ID format.\n\nIt should start with "household_"');
+                return;
+            }
+            
+            if (confirm(`🔄 Switch to household:\n${newHouseholdId}\n\nYour current pantry will be replaced with the new household's data.\n\nContinue?`)) {
+                // Unsubscribe from current listeners
+                if (pantryUnsubscribe) pantryUnsubscribe();
+                if (shoppingUnsubscribe) shoppingUnsubscribe();
+                if (membersUnsubscribe) membersUnsubscribe();
+                
+                // Update household ID
+                householdId = newHouseholdId;
+                localStorage.setItem('smartcart_household_id', householdId);
+                
+                // Reload to reconnect with new household
+                location.reload();
+            }
+        }
+
         async function deletePantryItem(id) {
             console.log('deletePantryItem called:', id);
             if (confirm('Delete this item?')) {
@@ -2765,6 +2838,12 @@
         };
 
         function renderUI() {
+            // Update household ID display
+            const householdIdDisplay = document.getElementById('householdIdDisplay');
+            if (householdIdDisplay) {
+                householdIdDisplay.value = householdId || 'Not connected';
+            }
+            
             // Check if we should show categorized view
             const viewMode = localStorage.getItem('pantryViewMode') || 'category';
             if (viewMode === 'category') {
