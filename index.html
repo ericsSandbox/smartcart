@@ -3028,7 +3028,7 @@
             const categoryId = 'category-' + category.replace(/\s+/g, '-');
             const categoryItems = document.getElementById(categoryId);
             if (categoryItems) {
-                categoryItems.style.display = newState ? 'none' : 'flex';
+                categoryItems.style.display = newState ? 'none' : 'grid';
                 // Update arrow
                 const header = categoryItems.previousElementSibling;
                 if (header) {
