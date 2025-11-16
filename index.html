@@ -754,23 +754,47 @@
                 <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
                     🔗 Share Household Access
                 </div>
-                <div style="font-size: 13px; color: #1e40af; margin-bottom: 12px;">
-                    Family members need this ID to see shared data:
+                
+                <!-- Current Household -->
+                <div style="font-size: 13px; color: #1e40af; margin-bottom: 8px;">
+                    Current household:
                 </div>
-                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                    <input type="text" id="householdIdDisplay" readonly 
-                           style="flex: 1; padding: 10px; border: 1px solid #93c5fd; border-radius: 6px; background: white; font-family: monospace; font-size: 13px;">
-                    <button onclick="copyHouseholdId()" 
-                            style="padding: 10px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                        📋 Copy
+                <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center;">
+                    <input type="text" id="householdNickname" placeholder="Nickname (optional)" 
+                           style="width: 120px; padding: 8px; border: 1px solid #93c5fd; border-radius: 6px; font-size: 12px;">
+                    <button onclick="saveHouseholdShortcut()" 
+                            style="padding: 8px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                        💾 Save
                     </button>
                 </div>
+                
+                <!-- Share Options -->
+                <div style="font-size: 13px; color: #1e40af; margin-bottom: 8px;">
+                    Share with family:
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <button onclick="copyHouseholdId()" 
+                            style="flex: 1; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">
+                        📋 Copy ID
+                    </button>
+                    <button onclick="shareHouseholdLink()" 
+                            style="flex: 1; padding: 10px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">
+                        🔗 Share Link
+                    </button>
+                </div>
+                <input type="text" id="householdIdDisplay" readonly 
+                       style="width: 100%; padding: 8px; border: 1px solid #93c5fd; border-radius: 6px; background: white; font-family: monospace; font-size: 11px; margin-bottom: 12px; color: #6b7280;">
+                
+                <!-- Saved Households -->
+                <div id="savedHouseholdsContainer"></div>
+                
+                <!-- Join Household -->
                 <details style="margin-top: 12px;">
                     <summary style="cursor: pointer; color: #1e40af; font-size: 13px; font-weight: 500;">
-                        Join a different household
+                        ➕ Join a different household
                     </summary>
                     <div style="margin-top: 12px;">
-                        <input type="text" id="joinHouseholdInput" placeholder="Paste household ID here"
+                        <input type="text" id="joinHouseholdInput" placeholder="Paste household ID or link here"
                                style="width: 100%; padding: 10px; border: 1px solid #93c5fd; border-radius: 6px; margin-bottom: 8px; font-family: monospace; font-size: 13px;">
                         <button onclick="joinHousehold()" 
                                 style="width: 100%; padding: 10px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
@@ -1025,11 +1049,22 @@
                     }
                 });
                 
-                // Get or create household ID from localStorage
-                householdId = localStorage.getItem('smartcart_household_id');
-                if (!householdId) {
-                    householdId = 'household_' + Date.now();
+                // Check URL for household ID parameter (e.g., ?household=household_123)
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlHouseholdId = urlParams.get('household');
+                
+                if (urlHouseholdId && urlHouseholdId.startsWith('household_')) {
+                    // URL has household ID - use it and save it
+                    householdId = urlHouseholdId;
                     localStorage.setItem('smartcart_household_id', householdId);
+                    console.log('🔗 Joined household from URL:', householdId);
+                } else {
+                    // Get or create household ID from localStorage
+                    householdId = localStorage.getItem('smartcart_household_id');
+                    if (!householdId) {
+                        householdId = 'household_' + Date.now();
+                        localStorage.setItem('smartcart_household_id', householdId);
+                    }
                 }
                 
                 console.log('✅ Firebase connected. Household ID:', householdId);
@@ -2440,31 +2475,92 @@
 
         // Household ID sharing functions
         function copyHouseholdId() {
-            const idInput = document.getElementById('householdIdDisplay');
-            idInput.select();
             navigator.clipboard.writeText(householdId).then(() => {
-                alert('✅ Household ID copied!\n\nShare this with family members so they can access the same pantry.');
+                alert('✅ Household ID copied!\n\nShare this with family members.');
             }).catch(err => {
-                // Fallback for older browsers
+                // Fallback
+                const idInput = document.getElementById('householdIdDisplay');
                 idInput.select();
                 document.execCommand('copy');
-                alert('✅ Household ID copied!\n\nShare this with family members so they can access the same pantry.');
+                alert('✅ Household ID copied!');
             });
         }
 
-        function joinHousehold() {
-            const newHouseholdId = document.getElementById('joinHouseholdInput').value.trim();
-            if (!newHouseholdId) {
-                alert('⚠️ Please enter a household ID');
+        function shareHouseholdLink() {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const shareUrl = `${baseUrl}?household=${householdId}`;
+            
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                alert('🔗 Link copied!\n\nSend this link to family members. They\'ll join automatically when they open it.');
+            }).catch(err => {
+                // Show URL in prompt for manual copy
+                prompt('📋 Copy this link:', shareUrl);
+            });
+        }
+
+        function saveHouseholdShortcut() {
+            const nickname = document.getElementById('householdNickname').value.trim();
+            if (!nickname) {
+                alert('⚠️ Please enter a nickname for this household');
                 return;
             }
             
-            if (!newHouseholdId.startsWith('household_')) {
-                alert('⚠️ Invalid household ID format.\n\nIt should start with "household_"');
+            // Get existing shortcuts
+            const shortcuts = JSON.parse(localStorage.getItem('household_shortcuts') || '[]');
+            
+            // Check if already exists
+            const existingIndex = shortcuts.findIndex(s => s.id === householdId);
+            if (existingIndex >= 0) {
+                shortcuts[existingIndex].nickname = nickname;
+            } else {
+                shortcuts.push({ id: householdId, nickname: nickname });
+            }
+            
+            localStorage.setItem('household_shortcuts', JSON.stringify(shortcuts));
+            document.getElementById('householdNickname').value = '';
+            renderSavedHouseholds();
+            alert('💾 Household shortcut saved!');
+        }
+
+        function renderSavedHouseholds() {
+            const shortcuts = JSON.parse(localStorage.getItem('household_shortcuts') || '[]');
+            const container = document.getElementById('savedHouseholdsContainer');
+            
+            if (shortcuts.length === 0) {
+                container.innerHTML = '';
                 return;
             }
             
-            if (confirm(`🔄 Switch to household:\n${newHouseholdId}\n\nYour current pantry will be replaced with the new household's data.\n\nContinue?`)) {
+            container.innerHTML = `
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #93c5fd;">
+                    <div style="font-size: 13px; color: #1e40af; margin-bottom: 8px; font-weight: 500;">
+                        💾 Saved Households:
+                    </div>
+                    ${shortcuts.map(shortcut => `
+                        <div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: center;">
+                            <button onclick="switchToHousehold('${shortcut.id}')" 
+                                    style="flex: 1; padding: 8px; background: ${shortcut.id === householdId ? '#3b82f6' : '#f3f4f6'}; 
+                                           color: ${shortcut.id === householdId ? 'white' : '#374151'}; border: none; border-radius: 6px; 
+                                           font-size: 13px; cursor: pointer; text-align: left;">
+                                ${shortcut.id === householdId ? '✓ ' : ''}${shortcut.nickname}
+                            </button>
+                            <button onclick="removeHouseholdShortcut('${shortcut.id}')" 
+                                    style="padding: 8px 10px; background: #ef4444; color: white; border: none; border-radius: 6px; 
+                                           font-size: 12px; cursor: pointer;">
+                                🗑️
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function switchToHousehold(newHouseholdId) {
+            if (newHouseholdId === householdId) {
+                return; // Already on this household
+            }
+            
+            if (confirm(`🔄 Switch household?\n\nYour pantry will update to show the selected household's data.`)) {
                 // Unsubscribe from current listeners
                 if (pantryUnsubscribe) pantryUnsubscribe();
                 if (shoppingUnsubscribe) shoppingUnsubscribe();
@@ -2472,6 +2568,50 @@
                 
                 // Update household ID
                 householdId = newHouseholdId;
+                localStorage.setItem('smartcart_household_id', householdId);
+                
+                // Reload to reconnect
+                location.reload();
+            }
+        }
+
+        function removeHouseholdShortcut(householdIdToRemove) {
+            if (confirm('🗑️ Remove this household shortcut?')) {
+                const shortcuts = JSON.parse(localStorage.getItem('household_shortcuts') || '[]');
+                const filtered = shortcuts.filter(s => s.id !== householdIdToRemove);
+                localStorage.setItem('household_shortcuts', JSON.stringify(filtered));
+                renderSavedHouseholds();
+            }
+        }
+
+        function joinHousehold() {
+            let input = document.getElementById('joinHouseholdInput').value.trim();
+            if (!input) {
+                alert('⚠️ Please enter a household ID or link');
+                return;
+            }
+            
+            // Extract household ID from URL if link was pasted
+            if (input.includes('?household=')) {
+                const match = input.match(/household=([^&]+)/);
+                if (match) {
+                    input = match[1];
+                }
+            }
+            
+            if (!input.startsWith('household_')) {
+                alert('⚠️ Invalid household ID format.\n\nIt should start with "household_"');
+                return;
+            }
+            
+            if (confirm(`🔄 Switch to household:\n${input}\n\nYour current pantry will be replaced with the new household's data.\n\nContinue?`)) {
+                // Unsubscribe from current listeners
+                if (pantryUnsubscribe) pantryUnsubscribe();
+                if (shoppingUnsubscribe) shoppingUnsubscribe();
+                if (membersUnsubscribe) membersUnsubscribe();
+                
+                // Update household ID
+                householdId = input;
                 localStorage.setItem('smartcart_household_id', householdId);
                 
                 // Reload to reconnect with new household
@@ -2843,6 +2983,9 @@
             if (householdIdDisplay) {
                 householdIdDisplay.value = householdId || 'Not connected';
             }
+            
+            // Render saved households shortcuts
+            renderSavedHouseholds();
             
             // Check if we should show categorized view
             const viewMode = localStorage.getItem('pantryViewMode') || 'category';
