@@ -3560,15 +3560,30 @@
         }
 
         async function toggleShoppingItem(listId, itemId) {
+            console.log('🔄 Toggle shopping item:', { listId, itemId, itemIdType: typeof itemId });
+            
             const list = shoppingLists.find(l => l.id === listId);
-            if (list) {
-                const item = list.items.find(i => i.id === itemId);
-                if (item) {
-                    const wasCompleted = item.completed;
-                    item.completed = !item.completed;
-                    
-                    // If marking as completed (shopped), add to pantry
-                    if (item.completed && !wasCompleted) {
+            if (!list) {
+                console.error('❌ List not found:', listId);
+                return;
+            }
+            
+            // Convert itemId to number if it's a string
+            const numericItemId = typeof itemId === 'string' ? parseInt(itemId) : itemId;
+            const item = list.items.find(i => i.id == numericItemId); // Use == for loose comparison
+            
+            if (!item) {
+                console.error('❌ Item not found:', numericItemId, 'in list items:', list.items.map(i => i.id));
+                return;
+            }
+            
+            const wasCompleted = item.completed;
+            item.completed = !item.completed;
+            console.log('✅ Item toggled:', item.name, 'completed:', item.completed);
+            
+            // If marking as completed (shopped), add to pantry
+            if (item.completed && !wasCompleted) {
+                console.log('➕ Adding to pantry:', item.name);
                         // Check if item already exists in pantry
                         const existingPantryItem = pantryItems.find(p => 
                             p.name.toLowerCase() === item.name.toLowerCase()
