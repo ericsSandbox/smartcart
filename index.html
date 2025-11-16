@@ -3635,9 +3635,10 @@
         async function removeShoppingItem(listId, itemId) {
             const list = shoppingLists.find(l => l.id === listId);
             if (list) {
-                list.items = list.items.filter(i => i.id !== itemId);
+                // Convert itemId to number if it's a string (same fix as toggleShoppingItem)
+                const numericItemId = typeof itemId === 'string' ? parseInt(itemId) : itemId;
+                list.items = list.items.filter(i => i.id != numericItemId); // Use loose equality
                 await updateShoppingListInFirebase(listId, { items: list.items });
-                // Real-time listener will update UI automatically
                 renderShoppingListDetails();
             }
         }
