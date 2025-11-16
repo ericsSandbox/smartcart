@@ -1629,11 +1629,6 @@
                 document.getElementById('addMemberForm').reset();
             });
 
-            document.getElementById('cancelShoppingBtn').addEventListener('click', () => {
-                document.getElementById('shoppingListModal').classList.remove('active');
-                document.getElementById('shoppingListName').value = '';
-            });
-
             document.getElementById('addForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 addManualItem();
