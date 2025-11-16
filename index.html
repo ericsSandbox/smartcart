@@ -1651,6 +1651,7 @@
                 }
             });
 
+            // Pantry search - live search as you type
             document.getElementById('searchInput').addEventListener('input', () => {
                 const viewMode = localStorage.getItem('pantryViewMode') || 'category';
                 if (viewMode === 'category') {
@@ -1660,8 +1661,30 @@
                 }
             });
 
+            // Pantry search - also trigger on Enter key
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const viewMode = localStorage.getItem('pantryViewMode') || 'category';
+                    if (viewMode === 'category') {
+                        renderPantryByCategory();
+                    } else {
+                        renderPantry();
+                    }
+                }
+            });
+
+            // Shopping search - live search as you type
             document.getElementById('shoppingSearch').addEventListener('input', () => {
                 renderShopping();
+            });
+
+            // Shopping search - also trigger on Enter key
+            document.getElementById('shoppingSearch').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    renderShopping();
+                }
             });
 
             // Quick add item with Enter key
