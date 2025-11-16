@@ -3628,11 +3628,8 @@
                         }
                     }
                     
-                    await updateShoppingListInFirebase(listId, { items: list.items });
-                    // Real-time listener will update UI automatically
-                    renderShoppingListDetails();
-                }
-            }
+            await updateShoppingListInFirebase(listId, { items: list.items });
+            renderShoppingListDetails();
         }
 
         async function removeShoppingItem(listId, itemId) {
