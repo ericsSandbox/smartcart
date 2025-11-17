@@ -698,8 +698,8 @@
 
             <div style="display: flex; gap: 8px; margin-bottom: 16px;">
                 <div style="flex: 1; background: #1e3a8a; border-radius: 8px; padding: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    <div style="font-size: 24px; font-weight: 600; color: #1f2937; text-shadow: 0 0 8px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.7);" id="totalCount">0</div>
-                    <div style="font-size: 13px; color: #1f2937; text-shadow: 0 0 6px rgba(255,255,255,0.8), 0 0 3px rgba(255,255,255,0.6);">Total Items</div>
+                    <div style="font-size: 24px; font-weight: 600; color: white;" id="totalCount">0</div>
+                    <div style="font-size: 13px; color: white;">Total Items</div>
                 </div>
                 <div style="flex: 1; background: #fef3c7; border-radius: 8px; padding: 12px; text-align: center;">
                     <div style="font-size: 24px; font-weight: 600; color: #1f2937;" id="expiredCount">0</div>
@@ -921,6 +921,25 @@
                 <div>
                     <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151;">Expiration Date</label>
                     <input type="date" id="editItemExpires" style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 6px; font-size: 14px;" />
+                </div>
+                
+                <!-- Move to Category -->
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151;">📁 Move to Category</label>
+                    <select id="editItemCategory" style="width: 100%; padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 14px;">
+                        <option value="Proteins">🍗 Proteins</option>
+                        <option value="Vegetables">🥬 Vegetables</option>
+                        <option value="Spices">🧂 Spices</option>
+                        <option value="Condiments">🍯 Condiments</option>
+                        <option value="Oils & Vinegars">🫒 Oils & Vinegars</option>
+                        <option value="Grains & Pasta">🌾 Grains & Pasta</option>
+                        <option value="Baking">🎂 Baking</option>
+                        <option value="Frozen">❄️ Frozen</option>
+                        <option value="Bakery">🥖 Bakery</option>
+                        <option value="Dairy & Cheese">🧀 Dairy & Cheese</option>
+                        <option value="Pantry">📦 Pantry</option>
+                        <option value="Household">🏠 Household</option>
+                    </select>
                 </div>
                 
                 <!-- Staple Status -->
@@ -2725,6 +2744,7 @@
             document.getElementById('editItemUnit').value = item.unit || 'unit';
             document.getElementById('editItemExpires').value = item.expires_at || '';
             document.getElementById('editItemStaple').checked = item.isStaple || false;
+            document.getElementById('editItemCategory').value = item.category || 'Pantry';
             
             document.getElementById('editPantryItemModal').classList.add('active');
         }
@@ -2748,12 +2768,14 @@
             const unit = document.getElementById('editItemUnit').value;
             const expires_at = document.getElementById('editItemExpires').value;
             const isStaple = document.getElementById('editItemStaple').checked;
+            const category = document.getElementById('editItemCategory').value;
             
             await updatePantryItemInFirebase(currentEditItemId, {
                 quantity,
                 unit,
                 expires_at: expires_at || null,
-                isStaple
+                isStaple,
+                category
             });
             
             closeEditPantryModal();
