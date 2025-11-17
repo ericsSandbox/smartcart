@@ -3549,6 +3549,20 @@
                 return;
             }
 
+            // Check if item exists in pantry
+            const pantryItem = pantryItems.find(p => p.name.toLowerCase() === name.toLowerCase());
+            if (pantryItem) {
+                const confirmAdd = confirm(`"${name}" is already in your pantry (${pantryItem.quantity} ${pantryItem.unit}).\n\nDo you still want to add it to your shopping list?`);
+                if (!confirmAdd) {
+                    // Clear form and refocus
+                    document.getElementById('quickAddItemName').value = '';
+                    document.getElementById('quickAddItemQty').value = '1';
+                    document.getElementById('quickAddItemUnit').value = 'unit';
+                    document.getElementById('quickAddItemName').focus();
+                    return;
+                }
+            }
+
             const list = shoppingLists.find(l => l.id === currentShoppingListId);
             if (list) {
                 const item = {
