@@ -1620,8 +1620,7 @@
                 if (activeTab === 'pantry') {
                     document.getElementById('addModal').classList.add('active');
                 } else if (activeTab === 'shopping') {
-                    document.getElementById('shoppingListModal').classList.add('active');
-                    renderShoppingListModal();
+                    createNewShoppingList();
                 } else if (activeTab === 'members') {
                     document.getElementById('addMemberModal').classList.add('active');
                 }
