@@ -903,10 +903,10 @@
                 <div>
                     <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151;">Quantity</label>
                     <div style="display: flex; align-items: center; gap: 12px;">
-                        <button class="qty-btn" onclick="adjustEditQuantity(-1)" style="width: 40px; height: 40px; font-size: 20px;">−</button>
-                        <input type="number" id="editItemQty" min="0" step="0.1" style="flex: 1; padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 16px; text-align: center; font-weight: 600;" />
-                        <button class="qty-btn" onclick="adjustEditQuantity(1)" style="width: 40px; height: 40px; font-size: 20px;">+</button>
-                        <select id="editItemUnit" style="padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 14px;">
+                        <button class="qty-btn" onclick="adjustEditQuantity(-1)" style="width: 48px; height: 48px; font-size: 24px;">−</button>
+                        <input type="number" id="editItemQty" min="0" step="0.1" style="flex: 1; min-width: 80px; padding: 12px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 20px; text-align: center; font-weight: 600;" />
+                        <button class="qty-btn" onclick="adjustEditQuantity(1)" style="width: 48px; height: 48px; font-size: 24px;">+</button>
+                        <select id="editItemUnit" onchange="updateQuantityStep()" style="padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 14px;">
                             <option>unit</option>
                             <option>lb</option>
                             <option>oz</option>
@@ -2844,6 +2844,9 @@
             document.getElementById('editItemStaple').checked = item.isStaple || false;
             document.getElementById('editItemCategory').value = item.category || 'Pantry';
             
+            // Set appropriate step for quantity input based on unit
+            updateQuantityStep();
+            
             document.getElementById('editPantryItemModal').classList.add('active');
         }
 
@@ -2852,10 +2855,40 @@
             currentEditItemId = null;
         }
 
+        function updateQuantityStep() {
+            const unit = document.getElementById('editItemUnit').value;
+            const input = document.getElementById('editItemQty');
+            
+            // Whole numbers for unit/piece, decimals for measurements
+            if (unit === 'unit' || unit === 'piece') {
+                input.step = '1';
+                // Round current value to whole number
+                const currentValue = parseFloat(input.value) || 1;
+                input.value = Math.round(currentValue);
+            } else {
+                input.step = '0.1';
+            }
+        }
+
         function adjustEditQuantity(change) {
             const input = document.getElementById('editItemQty');
+            const unit = document.getElementById('editItemUnit').value;
             const currentValue = parseFloat(input.value) || 1;
-            const newValue = Math.max(0, currentValue + change);
+            
+            // Use whole number increments for unit/piece, 0.1 for measurements
+            const increment = (unit === 'unit' || unit === 'piece') ? 1 : 0.1;
+            const adjustedChange = change * increment;
+            
+            let newValue = currentValue + adjustedChange;
+            newValue = Math.max(0, newValue);
+            
+            // Round to 1 decimal place for measurements, whole numbers for unit/piece
+            if (unit === 'unit' || unit === 'piece') {
+                newValue = Math.round(newValue);
+            } else {
+                newValue = Math.round(newValue * 10) / 10;
+            }
+            
             input.value = newValue;
         }
 
