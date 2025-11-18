@@ -928,6 +928,7 @@
                     <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151;">📁 Move to Category</label>
                     <select id="editItemCategory" style="width: 100%; padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 14px;">
                         <option value="Proteins">🍗 Proteins</option>
+                        <option value="Fruits">🍎 Fruits</option>
                         <option value="Vegetables">🥬 Vegetables</option>
                         <option value="Spices">🧂 Spices</option>
                         <option value="Condiments">🍯 Condiments</option>
@@ -2957,6 +2958,13 @@
                 'salmon', 'tuna', 'shrimp', 'crab', 'lobster', 'breast', 'roast', 'chop',
                 'meatball', 'sausage', 'stew meat', 'ground beef', 'ground pork', 'ground turkey', 'ground chicken'
             ],
+            'Fruits': [
+                'apple', 'banana', 'orange', 'grape', 'strawberry', 'blueberry', 'raspberry',
+                'blackberry', 'melon', 'watermelon', 'cantaloupe', 'honeydew', 'mango',
+                'pineapple', 'peach', 'pear', 'plum', 'cherry', 'kiwi', 'papaya',
+                'pomegranate', 'tangerine', 'mandarin', 'clementine', 'grapefruit',
+                'apricot', 'nectarine', 'fig', 'date', 'coconut', 'passionfruit'
+            ],
             'Vegetables': [
                 'cucumber', 'onion', 'carrot', 'celery', 'lettuce', 'spinach', 'kale',
                 'broccoli', 'cauliflower', 'cabbage', 'peppers', 'squash', 'zucchini',
@@ -3087,7 +3095,7 @@
                 document.getElementById('emptyState').style.display = 'none';
                 
                 // Sort categories in display order
-                const categoryOrder = ['Proteins', 'Vegetables', 'Spices', 'Condiments', 'Oils & Vinegars', 'Grains & Pasta', 'Baking', 'Frozen', 'Bakery', 'Dairy & Cheese', 'Pantry', 'Household'];
+                const categoryOrder = ['Proteins', 'Fruits', 'Vegetables', 'Spices', 'Condiments', 'Oils & Vinegars', 'Grains & Pasta', 'Baking', 'Frozen', 'Bakery', 'Dairy & Cheese', 'Pantry', 'Household'];
                 const sortedCategories = categoryOrder.filter(cat => filteredGrouped[cat]);
                 
                 // Alternating tile colors
@@ -3104,6 +3112,7 @@
                     const items = filteredGrouped[cat];
                     const categoryEmojis = {
                         'Proteins': '🍗',
+                        'Fruits': '🍎',
                         'Vegetables': '🥬',
                         'Spices': '🧂',
                         'Condiments': '🍯',
