@@ -2911,8 +2911,13 @@
                 if (addToList) {
                     // Find or create "House" shopping list
                     let houseList = shoppingLists.find(l => l.name === '🏠 House');
+                    let houseListId = null;
+                    let houseItems = [];
                     
-                    if (!houseList) {
+                    if (houseList) {
+                        houseListId = houseList.id;
+                        houseItems = [...(houseList.items || [])];
+                    } else {
                         // Create House list
                         const newList = {
                             name: '🏠 House',
@@ -2920,36 +2925,49 @@
                             createdAt: new Date().toISOString()
                         };
                         const docRef = await addShoppingListToFirebase(newList);
-                        houseList = { ...newList, id: docRef.id };
+                        houseListId = docRef.id;
+                        houseItems = [];
                     }
                     
                     // Check for Staples list and merge it
                     const staplesList = shoppingLists.find(l => l.name === '⭐ Staples');
-                    if (staplesList) {
+                    if (staplesList && staplesList.items) {
+                        console.log('📋 Merging Staples list with', staplesList.items.length, 'items');
                         // Merge Staples items into House
                         staplesList.items.forEach(stapleItem => {
-                            const existsInHouse = houseList.items.find(hi => hi.name.toLowerCase() === stapleItem.name.toLowerCase());
+                            const existsInHouse = houseItems.find(hi => hi.name.toLowerCase() === stapleItem.name.toLowerCase());
                             if (!existsInHouse) {
-                                houseList.items.push(stapleItem);
+                                // Create a copy of the item with a new ID
+                                houseItems.push({
+                                    id: Date.now() + Math.random(), // Ensure unique ID
+                                    name: stapleItem.name,
+                                    quantity: stapleItem.quantity,
+                                    unit: stapleItem.unit,
+                                    completed: stapleItem.completed || false
+                                });
                             }
                         });
                         // Delete Staples list
                         await deleteShoppingListFromFirebase(staplesList.id);
+                        console.log('✅ Staples list merged and deleted');
                     }
                     
                     // Add current item to House list
-                    const existsInHouse = houseList.items.find(hi => hi.name.toLowerCase() === item.name.toLowerCase());
+                    const existsInHouse = houseItems.find(hi => hi.name.toLowerCase() === item.name.toLowerCase());
                     if (!existsInHouse) {
-                        houseList.items.push({
+                        houseItems.push({
                             id: Date.now(),
                             name: item.name,
                             quantity: 1,
                             unit: unit,
                             completed: false
                         });
+                        console.log('➕ Added', item.name, 'to House list');
                     }
                     
-                    await updateShoppingListInFirebase(houseList.id, { items: houseList.items });
+                    // Update House list with all items
+                    await updateShoppingListInFirebase(houseListId, { items: houseItems });
+                    console.log('💾 Saved House list with', houseItems.length, 'items');
                 }
                 
                 // Delete from pantry
