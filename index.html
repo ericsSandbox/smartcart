@@ -1106,6 +1106,79 @@
         }
 
         // ============================================
+        // HELPER FUNCTIONS - Fuzzy Matching
+        // ============================================
+
+        // Calculate Levenshtein distance between two strings
+        function levenshteinDistance(str1, str2) {
+            const len1 = str1.length;
+            const len2 = str2.length;
+            const matrix = [];
+
+            for (let i = 0; i <= len1; i++) {
+                matrix[i] = [i];
+            }
+
+            for (let j = 0; j <= len2; j++) {
+                matrix[0][j] = j;
+            }
+
+            for (let i = 1; i <= len1; i++) {
+                for (let j = 1; j <= len2; j++) {
+                    if (str1[i - 1] === str2[j - 1]) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1, // substitution
+                            matrix[i][j - 1] + 1,     // insertion
+                            matrix[i - 1][j] + 1      // deletion
+                        );
+                    }
+                }
+            }
+
+            return matrix[len1][len2];
+        }
+
+        // Find similar item names (returns null if exact match or no close match)
+        function findSimilarItem(inputName, existingItems) {
+            const input = inputName.toLowerCase().trim();
+            
+            // Check for exact match first
+            const exactMatch = existingItems.find(item => 
+                item.name.toLowerCase() === input
+            );
+            if (exactMatch) {
+                return { type: 'exact', item: exactMatch };
+            }
+
+            // Find close matches (within 2 character edits)
+            let bestMatch = null;
+            let bestDistance = Infinity;
+
+            existingItems.forEach(item => {
+                const itemName = item.name.toLowerCase();
+                const distance = levenshteinDistance(input, itemName);
+                
+                // Consider it a potential typo if:
+                // 1. Distance is 1-2 characters for short words (<=8 chars)
+                // 2. Distance is 1-3 characters for longer words
+                const threshold = input.length <= 8 ? 2 : 3;
+                
+                if (distance > 0 && distance <= threshold && distance < bestDistance) {
+                    bestDistance = distance;
+                    bestMatch = item;
+                }
+            });
+
+            if (bestMatch) {
+                return { type: 'similar', item: bestMatch, distance: bestDistance };
+            }
+
+            return null;
+        }
+
+        // ============================================
         // FIREBASE DATA LAYER - Real-time Sync
         // ============================================
 
@@ -2486,18 +2559,43 @@
                 return;
             }
             
-            // Check for duplicate
-            const existing = findDuplicateItem(name);
+            // Check for similar items (typos)
+            const similarMatch = findSimilarItem(name, pantryItems);
             
-            if (existing) {
-                // Add to existing item
-                const addQty = parseFloat(document.getElementById('itemQty').value || 1);
-                const oldQty = existing.quantity;
-                const newQty = oldQty + addQty;
-                await updatePantryItemInFirebase(existing.id, { quantity: newQty });
-                alert(`✅ Smart Duplicate Detection!\n\nAdded ${addQty} unit(s) to existing "${existing.name}"\n\nOld total: ${oldQty} ${existing.unit}\nNew total: ${newQty} ${existing.unit}`);
+            if (similarMatch) {
+                if (similarMatch.type === 'exact') {
+                    // Exact match - add to existing
+                    const existing = similarMatch.item;
+                    const addQty = parseFloat(document.getElementById('itemQty').value || 1);
+                    const oldQty = existing.quantity;
+                    const newQty = oldQty + addQty;
+                    await updatePantryItemInFirebase(existing.id, { quantity: newQty });
+                    alert(`✅ Smart Duplicate Detection!\n\nAdded ${addQty} unit(s) to existing "${existing.name}"\n\nOld total: ${oldQty} ${existing.unit}\nNew total: ${newQty} ${existing.unit}`);
+                } else if (similarMatch.type === 'similar') {
+                    // Similar match - ask user
+                    const useSuggestion = confirm(`Did you mean "${similarMatch.item.name}"?\n\nYou typed: "${name}"\nWe found: "${similarMatch.item.name}" (${similarMatch.item.quantity} ${similarMatch.item.unit})\n\nClick OK to use "${similarMatch.item.name}" or Cancel to create "${name}" as a new item.`);
+                    
+                    if (useSuggestion) {
+                        // Add to existing item
+                        const addQty = parseFloat(document.getElementById('itemQty').value || 1);
+                        const oldQty = similarMatch.item.quantity;
+                        const newQty = oldQty + addQty;
+                        await updatePantryItemInFirebase(similarMatch.item.id, { quantity: newQty });
+                        alert(`✅ Added to "${similarMatch.item.name}"\n\nOld total: ${oldQty} ${similarMatch.item.unit}\nNew total: ${newQty} ${similarMatch.item.unit}`);
+                    } else {
+                        // Create new item as typed
+                        const item = {
+                            name: name,
+                            quantity: parseFloat(document.getElementById('itemQty').value || 1),
+                            unit: document.getElementById('itemUnit').value,
+                            expires_at: document.getElementById('itemExpires').value || null
+                        };
+                        await addPantryItemToFirebase(item);
+                        alert(`➕ Created new entry: "${name}"`);
+                    }
+                }
             } else {
-                // Create new item in Firebase
+                // No match - create new item
                 const item = {
                     name: name,
                     quantity: parseFloat(document.getElementById('itemQty').value || 1),
@@ -3549,11 +3647,16 @@
                 return;
             }
 
-            // Check if item exists in pantry
-            const pantryItem = pantryItems.find(p => p.name.toLowerCase() === name.toLowerCase());
-            if (pantryItem) {
-                const confirmAdd = confirm(`"${name}" is already in your pantry (${pantryItem.quantity} ${pantryItem.unit}).\n\nDo you still want to add it to your shopping list?`);
-                if (!confirmAdd) {
+            const list = shoppingLists.find(l => l.id === currentShoppingListId);
+            if (!list) return;
+
+            // Check for typos in current shopping list items
+            const allShoppingItems = list.items || [];
+            const shoppingMatch = findSimilarItem(name, allShoppingItems);
+            
+            if (shoppingMatch && shoppingMatch.type === 'similar') {
+                const useSuggestion = confirm(`Did you mean "${shoppingMatch.item.name}"?\n\nYou typed: "${name}"\nWe found in this list: "${shoppingMatch.item.name}"\n\nClick OK to use the existing item name or Cancel to add "${name}" as typed.`);
+                if (useSuggestion) {
                     // Clear form and refocus
                     document.getElementById('quickAddItemName').value = '';
                     document.getElementById('quickAddItemQty').value = '1';
@@ -3563,30 +3666,60 @@
                 }
             }
 
-            const list = shoppingLists.find(l => l.id === currentShoppingListId);
-            if (list) {
-                const item = {
-                    id: Date.now(),
-                    name: name,
-                    quantity: parseFloat(document.getElementById('quickAddItemQty').value || 1),
-                    unit: document.getElementById('quickAddItemUnit').value,
-                    completed: false
-                };
-                
-                list.items.push(item);
-                await updateShoppingListInFirebase(list.id, { items: list.items });
-                
-                // Immediately update UI for instant feedback
-                renderShoppingListDetails();
-                
-                // Clear form
-                document.getElementById('quickAddItemName').value = '';
-                document.getElementById('quickAddItemQty').value = '1';
-                document.getElementById('quickAddItemUnit').value = 'unit';
-                
-                // Refocus on name input for quick multiple adds
-                document.getElementById('quickAddItemName').focus();
+            // Check for typos in pantry items
+            const pantryMatch = findSimilarItem(name, pantryItems);
+            
+            if (pantryMatch) {
+                if (pantryMatch.type === 'exact') {
+                    // Exact match in pantry
+                    const confirmAdd = confirm(`"${name}" is already in your pantry (${pantryMatch.item.quantity} ${pantryMatch.item.unit}).\n\nDo you still want to add it to your shopping list?`);
+                    if (!confirmAdd) {
+                        document.getElementById('quickAddItemName').value = '';
+                        document.getElementById('quickAddItemQty').value = '1';
+                        document.getElementById('quickAddItemUnit').value = 'unit';
+                        document.getElementById('quickAddItemName').focus();
+                        return;
+                    }
+                } else if (pantryMatch.type === 'similar') {
+                    // Similar match in pantry
+                    const usePantrySuggestion = confirm(`Did you mean "${pantryMatch.item.name}"?\n\nYou typed: "${name}"\nWe found in pantry: "${pantryMatch.item.name}" (${pantryMatch.item.quantity} ${pantryMatch.item.unit})\n\nClick OK to use "${pantryMatch.item.name}" or Cancel to use "${name}" as typed.\n\nNote: "${pantryMatch.item.name}" is already in your pantry!`);
+                    if (usePantrySuggestion) {
+                        const confirmAdd = confirm(`"${pantryMatch.item.name}" is already in your pantry (${pantryMatch.item.quantity} ${pantryMatch.item.unit}).\n\nDo you still want to add it to your shopping list?`);
+                        if (!confirmAdd) {
+                            document.getElementById('quickAddItemName').value = '';
+                            document.getElementById('quickAddItemQty').value = '1';
+                            document.getElementById('quickAddItemUnit').value = 'unit';
+                            document.getElementById('quickAddItemName').focus();
+                            return;
+                        }
+                        // Use corrected name
+                        document.getElementById('quickAddItemName').value = pantryMatch.item.name;
+                    }
+                }
             }
+
+            const finalName = document.getElementById('quickAddItemName').value.trim();
+            const item = {
+                id: Date.now(),
+                name: finalName,
+                quantity: parseFloat(document.getElementById('quickAddItemQty').value || 1),
+                unit: document.getElementById('quickAddItemUnit').value,
+                completed: false
+            };
+            
+            list.items.push(item);
+            await updateShoppingListInFirebase(list.id, { items: list.items });
+            
+            // Immediately update UI for instant feedback
+            renderShoppingListDetails();
+            
+            // Clear form
+            document.getElementById('quickAddItemName').value = '';
+            document.getElementById('quickAddItemQty').value = '1';
+            document.getElementById('quickAddItemUnit').value = 'unit';
+            
+            // Refocus on name input for quick multiple adds
+            document.getElementById('quickAddItemName').focus();
         }
 
         function closeShoppingListModal() {
