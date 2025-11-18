@@ -735,56 +735,68 @@
             <!-- Household Management Section -->
             <div style="background: #eff6ff; border: 2px solid #3b82f6; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
                 <div style="font-weight: 600; color: #1e40af; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 16px;">
-                    🏠 Household Management
+                    🏠 Households
                 </div>
                 
                 <!-- Current Household -->
-                <div style="font-size: 13px; color: #1e40af; margin-bottom: 8px;">
-                    Current household:
-                </div>
-                <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center;">
-                    <input type="text" id="householdNickname" placeholder="Nickname (optional)" 
-                           style="width: 120px; padding: 8px; border: 1px solid #93c5fd; border-radius: 6px; font-size: 12px;">
-                    <button onclick="saveHouseholdShortcut()" 
-                            style="padding: 8px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                        💾 Save
-                    </button>
-                </div>
-                
-                <!-- Share Options -->
-                <div style="font-size: 13px; color: #1e40af; margin-bottom: 8px;">
-                    Share with family:
-                </div>
-                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                    <button onclick="copyHouseholdId()" 
-                            style="flex: 1; padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">
-                        📋 Copy ID
-                    </button>
-                    <button onclick="shareHouseholdLink()" 
-                            style="flex: 1; padding: 10px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">
-                        🔗 Share Link
-                    </button>
-                </div>
-                <input type="text" id="householdIdDisplay" readonly 
-                       style="width: 100%; padding: 8px; border: 1px solid #93c5fd; border-radius: 6px; background: white; font-family: monospace; font-size: 11px; margin-bottom: 12px; color: #6b7280;">
-                
-                <!-- Saved Households -->
-                <div id="savedHouseholdsContainer"></div>
-                
-                <!-- Join Household -->
-                <details style="margin-top: 12px;">
-                    <summary style="cursor: pointer; color: #1e40af; font-size: 13px; font-weight: 500;">
-                        ➕ Join a different household
-                    </summary>
-                    <div style="margin-top: 12px;">
-                        <input type="text" id="joinHouseholdInput" placeholder="Paste household ID or link here"
-                               style="width: 100%; padding: 10px; border: 1px solid #93c5fd; border-radius: 6px; margin-bottom: 8px; font-family: monospace; font-size: 13px;">
-                        <button onclick="joinHousehold()" 
-                                style="width: 100%; padding: 10px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                            Join Household
+                <div style="background: white; border-radius: 8px; padding: 12px; margin-bottom: 12px; border: 2px solid #3b82f6;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="font-weight: 600; color: #1e40af; font-size: 14px;">Active Household</div>
+                        <div style="font-size: 11px; background: #3b82f6; color: white; padding: 3px 8px; border-radius: 12px;">CURRENT</div>
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                        <input type="text" id="householdNickname" placeholder="Name this household..." 
+                               style="flex: 1; padding: 8px; border: 1px solid #93c5fd; border-radius: 6px; font-size: 13px; font-weight: 500;">
+                        <button onclick="saveHouseholdShortcut()" 
+                                style="padding: 8px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                            💾
                         </button>
                     </div>
-                </details>
+                    <input type="text" id="householdIdDisplay" readonly 
+                           style="width: 100%; padding: 8px; border: 1px solid #93c5fd; border-radius: 6px; background: #f9fafb; font-family: monospace; font-size: 10px; margin-bottom: 8px; color: #6b7280;">
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="copyHouseholdId()" 
+                                style="flex: 1; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px;">
+                            📋 Copy ID
+                        </button>
+                        <button onclick="shareHouseholdLink()" 
+                                style="flex: 1; padding: 8px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px;">
+                            🔗 Share Link
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- My Households List -->
+                <div style="font-size: 13px; color: #1e40af; margin-bottom: 8px; font-weight: 600;">My Households</div>
+                <div id="savedHouseholdsContainer" style="margin-bottom: 12px;"></div>
+                
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                    <button onclick="createNewHousehold()" 
+                            style="flex: 1; padding: 10px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">
+                        ➕ Create New
+                    </button>
+                    <button onclick="toggleJoinHousehold()" 
+                            style="flex: 1; padding: 10px; background: #6366f1; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">
+                        🔗 Join Existing
+                    </button>
+                </div>
+                
+                <!-- Join Household (Hidden by default) -->
+                <div id="joinHouseholdSection" style="display: none; background: white; border-radius: 8px; padding: 12px; border: 1px solid #93c5fd;">
+                    <input type="text" id="joinHouseholdInput" placeholder="Paste household ID or link here"
+                           style="width: 100%; padding: 10px; border: 1px solid #93c5fd; border-radius: 6px; margin-bottom: 8px; font-family: monospace; font-size: 12px;">
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="joinHousehold()" 
+                                style="flex: 1; padding: 8px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px;">
+                            Join
+                        </button>
+                        <button onclick="toggleJoinHousehold()" 
+                                style="flex: 1; padding: 8px; background: #6b7280; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px;">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- Data Management Section -->
@@ -2681,33 +2693,34 @@
             const shortcuts = JSON.parse(localStorage.getItem('household_shortcuts') || '[]');
             const container = document.getElementById('savedHouseholdsContainer');
             
-            if (shortcuts.length === 0) {
-                container.innerHTML = '';
+            // Filter out the current household from the list
+            const otherHouseholds = shortcuts.filter(s => s.id !== householdId);
+            
+            if (otherHouseholds.length === 0) {
+                container.innerHTML = '<div style="font-size: 12px; color: #9ca3af; text-align: center; padding: 12px;">No other households saved</div>';
                 return;
             }
             
-            container.innerHTML = `
-                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #93c5fd;">
-                    <div style="font-size: 13px; color: #1e40af; margin-bottom: 8px; font-weight: 500;">
-                        💾 Saved Households:
-                    </div>
-                    ${shortcuts.map(shortcut => `
-                        <div style="display: flex; gap: 8px; margin-bottom: 6px; align-items: center;">
-                            <button onclick="switchToHousehold('${shortcut.id}')" 
-                                    style="flex: 1; padding: 8px; background: ${shortcut.id === householdId ? '#3b82f6' : '#f3f4f6'}; 
-                                           color: ${shortcut.id === householdId ? 'white' : '#374151'}; border: none; border-radius: 6px; 
-                                           font-size: 13px; cursor: pointer; text-align: left;">
-                                ${shortcut.id === householdId ? '✓ ' : ''}${shortcut.nickname}
-                            </button>
-                            <button onclick="removeHouseholdShortcut('${shortcut.id}')" 
-                                    style="padding: 8px 10px; background: #ef4444; color: white; border: none; border-radius: 6px; 
-                                           font-size: 12px; cursor: pointer;">
-                                🗑️
-                            </button>
+            container.innerHTML = otherHouseholds.map(shortcut => `
+                <div style="display: flex; gap: 8px; margin-bottom: 8px; background: white; border-radius: 8px; padding: 10px; border: 1px solid #d1d5db; cursor: pointer; transition: all 0.2s;" 
+                     onclick="switchToHousehold('${shortcut.id}')"
+                     onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 2px 4px rgba(59,130,246,0.2)'"
+                     onmouseout="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: #1f2937; font-size: 13px; margin-bottom: 2px;">
+                            ${shortcut.nickname}
                         </div>
-                    `).join('')}
+                        <div style="font-size: 10px; color: #6b7280; font-family: monospace;">
+                            ${shortcut.id.substring(0, 30)}...
+                        </div>
+                    </div>
+                    <button onclick="event.stopPropagation(); removeHouseholdShortcut('${shortcut.id}')" 
+                            style="padding: 6px 8px; background: #ef4444; color: white; border: none; border-radius: 6px; 
+                                   font-size: 11px; cursor: pointer; height: fit-content;">
+                        🗑️
+                    </button>
                 </div>
-            `;
+            `).join('');
         }
 
         function switchToHousehold(newHouseholdId) {
@@ -2737,6 +2750,56 @@
                 localStorage.setItem('household_shortcuts', JSON.stringify(filtered));
                 renderSavedHouseholds();
             }
+        }
+
+        function toggleJoinHousehold() {
+            const section = document.getElementById('joinHouseholdSection');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+                document.getElementById('joinHouseholdInput').value = '';
+            }
+        }
+
+        async function createNewHousehold() {
+            const name = prompt('📝 Name your new household:\n\n(e.g., "Main House", "Beach House", "Mom\'s Place")');
+            if (!name || !name.trim()) {
+                return;
+            }
+            
+            const confirmCreate = confirm(`✨ Create new household:\n"${name.trim()}"\n\nYour current household will be saved and you can switch back anytime.\n\nContinue?`);
+            if (!confirmCreate) {
+                return;
+            }
+            
+            // Save current household first
+            const currentNickname = document.getElementById('householdNickname').value.trim() || 'Unnamed Household';
+            saveHouseholdShortcut();
+            
+            // Generate new household ID
+            const newHouseholdId = 'household_' + Date.now();
+            
+            // Unsubscribe from current listeners
+            if (pantryUnsubscribe) pantryUnsubscribe();
+            if (shoppingUnsubscribe) shoppingUnsubscribe();
+            if (membersUnsubscribe) membersUnsubscribe();
+            
+            // Update household ID
+            householdId = newHouseholdId;
+            localStorage.setItem('smartcart_household_id', householdId);
+            
+            // Save new household with name
+            let savedHouseholds = JSON.parse(localStorage.getItem('smartcart_saved_households') || '[]');
+            savedHouseholds.push({
+                id: newHouseholdId,
+                nickname: name.trim(),
+                savedAt: new Date().toISOString()
+            });
+            localStorage.setItem('smartcart_saved_households', JSON.stringify(savedHouseholds));
+            
+            // Reload to initialize new empty household
+            location.reload();
         }
 
         function joinHousehold() {
