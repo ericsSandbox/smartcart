@@ -746,11 +746,15 @@
                     </div>
                     <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
                         <input type="text" id="householdNickname" placeholder="Name this household..." 
+                               oninput="updateSaveButtonState()"
                                style="flex: 1; padding: 8px; border: 1px solid #93c5fd; border-radius: 6px; font-size: 13px; font-weight: 500;">
-                        <button onclick="saveHouseholdShortcut()" 
+                        <button id="saveHouseholdBtn" onclick="saveHouseholdShortcut()" 
                                 style="padding: 8px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
                             💾
                         </button>
+                    </div>
+                    <div id="householdSavedMessage" style="display: none; font-size: 11px; color: #10b981; margin-bottom: 8px; font-weight: 500;">
+                        ✓ Household already saved
                     </div>
                     <input type="text" id="householdIdDisplay" readonly 
                            style="width: 100%; padding: 8px; border: 1px solid #93c5fd; border-radius: 6px; background: #f9fafb; font-family: monospace; font-size: 10px; margin-bottom: 8px; color: #6b7280;">
@@ -2686,7 +2690,41 @@
             localStorage.setItem('household_shortcuts', JSON.stringify(shortcuts));
             document.getElementById('householdNickname').value = '';
             renderSavedHouseholds();
+            updateSaveButtonState();
             alert('💾 Household shortcut saved!');
+        }
+
+        function loadHouseholdNickname() {
+            const shortcuts = JSON.parse(localStorage.getItem('household_shortcuts') || '[]');
+            const current = shortcuts.find(s => s.id === householdId);
+            const nicknameInput = document.getElementById('householdNickname');
+            if (current && nicknameInput) {
+                nicknameInput.value = current.nickname;
+            }
+        }
+
+        function updateSaveButtonState() {
+            const shortcuts = JSON.parse(localStorage.getItem('household_shortcuts') || '[]');
+            const current = shortcuts.find(s => s.id === householdId);
+            const saveBtn = document.getElementById('saveHouseholdBtn');
+            const savedMsg = document.getElementById('householdSavedMessage');
+            const nicknameInput = document.getElementById('householdNickname');
+            
+            if (!saveBtn || !savedMsg || !nicknameInput) return;
+            
+            if (current) {
+                // Already saved - disable button
+                saveBtn.disabled = true;
+                saveBtn.style.opacity = '0.5';
+                saveBtn.style.cursor = 'not-allowed';
+                savedMsg.style.display = 'block';
+            } else {
+                // Not saved yet - enable button
+                saveBtn.disabled = false;
+                saveBtn.style.opacity = '1';
+                saveBtn.style.cursor = 'pointer';
+                savedMsg.style.display = 'none';
+            }
         }
 
         function renderSavedHouseholds() {
@@ -3374,8 +3412,14 @@
                 householdIdDisplay.value = householdId || 'Not connected';
             }
             
+            // Load household nickname
+            loadHouseholdNickname();
+            
             // Render saved households shortcuts
             renderSavedHouseholds();
+            
+            // Update save button state
+            updateSaveButtonState();
             
             // Check if we should show categorized view
             const viewMode = localStorage.getItem('pantryViewMode') || 'category';
