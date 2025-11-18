@@ -904,7 +904,7 @@
                     <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #374151;">Quantity</label>
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <button class="qty-btn" onclick="adjustEditQuantity(-1)" style="width: 40px; height: 40px; font-size: 20px;">−</button>
-                        <input type="number" id="editItemQty" min="0.1" step="0.1" style="flex: 1; padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 16px; text-align: center; font-weight: 600;" />
+                        <input type="number" id="editItemQty" min="0" step="0.1" style="flex: 1; padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 16px; text-align: center; font-weight: 600;" />
                         <button class="qty-btn" onclick="adjustEditQuantity(1)" style="width: 40px; height: 40px; font-size: 20px;">+</button>
                         <select id="editItemUnit" style="padding: 10px; border: 2px solid #3b82f6; border-radius: 6px; font-size: 14px;">
                             <option>unit</option>
@@ -2855,7 +2855,7 @@
         function adjustEditQuantity(change) {
             const input = document.getElementById('editItemQty');
             const currentValue = parseFloat(input.value) || 1;
-            const newValue = Math.max(0.1, currentValue + change);
+            const newValue = Math.max(0, currentValue + change);
             input.value = newValue;
         }
 
@@ -2867,6 +2867,63 @@
             const expires_at = document.getElementById('editItemExpires').value;
             const isStaple = document.getElementById('editItemStaple').checked;
             const category = document.getElementById('editItemCategory').value;
+            
+            // Handle zero quantity
+            if (quantity <= 0) {
+                const item = pantryItems.find(i => i.id === currentEditItemId);
+                if (!item) return;
+                
+                const addToList = confirm(`You're out of "${item.name}"!\n\nWould you like to add it to your shopping list?\n\nClick OK to add to shopping list, or Cancel to just remove from pantry.`);
+                
+                if (addToList) {
+                    // Find or create "House" shopping list
+                    let houseList = shoppingLists.find(l => l.name === '🏠 House');
+                    
+                    if (!houseList) {
+                        // Create House list
+                        const newList = {
+                            name: '🏠 House',
+                            items: [],
+                            createdAt: new Date().toISOString()
+                        };
+                        const docRef = await addShoppingListToFirebase(newList);
+                        houseList = { ...newList, id: docRef.id };
+                    }
+                    
+                    // Check for Staples list and merge it
+                    const staplesList = shoppingLists.find(l => l.name === '⭐ Staples');
+                    if (staplesList) {
+                        // Merge Staples items into House
+                        staplesList.items.forEach(stapleItem => {
+                            const existsInHouse = houseList.items.find(hi => hi.name.toLowerCase() === stapleItem.name.toLowerCase());
+                            if (!existsInHouse) {
+                                houseList.items.push(stapleItem);
+                            }
+                        });
+                        // Delete Staples list
+                        await deleteShoppingListFromFirebase(staplesList.id);
+                    }
+                    
+                    // Add current item to House list
+                    const existsInHouse = houseList.items.find(hi => hi.name.toLowerCase() === item.name.toLowerCase());
+                    if (!existsInHouse) {
+                        houseList.items.push({
+                            id: Date.now(),
+                            name: item.name,
+                            quantity: 1,
+                            unit: unit,
+                            completed: false
+                        });
+                    }
+                    
+                    await updateShoppingListInFirebase(houseList.id, { items: houseList.items });
+                }
+                
+                // Delete from pantry
+                await deletePantryItemFromFirebase(currentEditItemId);
+                closeEditPantryModal();
+                return;
+            }
             
             await updatePantryItemInFirebase(currentEditItemId, {
                 quantity,
