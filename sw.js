@@ -1,12 +1,13 @@
 // Service Worker for SmartCart - Offline-First Support
 // This enables the app to work offline after first load
 
-const CACHE_NAME = 'smartcart-v1';
+const CACHE_NAME = 'smartcart-v2';
 const urlsToCache = [
     '/',
     '/index.html',
     '/smartcart/',
-    '/smartcart/index.html'
+    '/smartcart/index.html',
+    '/smartcart/css/styles.css'
 ];
 
 // Install event - cache app shell
