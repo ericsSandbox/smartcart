@@ -3698,15 +3698,15 @@
             };
 
             try {
-                // Add merged list to Firebase
-                const docRef = await addShoppingListToFirebase(newMergedList);
-                console.log('💾 Merged list created:', docRef.id);
+                // Add merged list to Firebase (returns the document ID as a string)
+                const mergedListId = await addShoppingListToFirebase(newMergedList);
+                console.log('💾 Merged list created:', mergedListId);
                 
                 // Wait a moment for real-time listener to update
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Verify the list was created with items
-                const createdList = shoppingLists.find(l => l.id === docRef.id);
+                const createdList = shoppingLists.find(l => l.id === mergedListId);
                 console.log('🔍 Verification check:', createdList ? `Found list with ${createdList.items?.length || 0} items` : 'List not found yet');
                 
                 if (createdList && createdList.items && createdList.items.length > 0) {
@@ -3726,8 +3726,8 @@
                     if (dialog) dialog.remove();
                     
                     // Open the merged list
-                    currentShoppingListId = docRef.id;
-                    openShoppingListToShop(docRef.id);
+                    currentShoppingListId = mergedListId;
+                    openShoppingListToShop(mergedListId);
                     
                     alert(`✅ Created merged list "${mergeName}"\n\n${mergedItemsArray.length} total items\n${selectedLists.length} source lists deleted\n\nItems marked with x2, x3 appear in multiple lists`);
                 } else {
@@ -3741,8 +3741,8 @@
                     if (dialog) dialog.remove();
                     
                     // Still open the merged list so user can verify
-                    currentShoppingListId = docRef.id;
-                    openShoppingListToShop(docRef.id);
+                    currentShoppingListId = mergedListId;
+                    openShoppingListToShop(mergedListId);
                 }
             } catch (error) {
                 console.error('❌ Error during merge:', error);
