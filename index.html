@@ -3702,16 +3702,24 @@
                 const docRef = await addShoppingListToFirebase(newMergedList);
                 console.log('💾 Merged list created:', docRef.id);
                 
+                // Wait a moment for real-time listener to update
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
                 // Verify the list was created with items
                 const createdList = shoppingLists.find(l => l.id === docRef.id);
+                console.log('🔍 Verification check:', createdList ? `Found list with ${createdList.items?.length || 0} items` : 'List not found yet');
+                
                 if (createdList && createdList.items && createdList.items.length > 0) {
                     console.log('✅ Verified merged list has', createdList.items.length, 'items');
                     
                     // Now delete source lists
+                    console.log('🗑️ Starting deletion of', selectedListIds.length, 'source lists');
                     for (const listId of selectedListIds) {
                         console.log('🗑️ Deleting source list:', listId);
                         await deleteShoppingListFromFirebase(listId);
+                        console.log('✅ Deleted:', listId);
                     }
+                    console.log('✅ All source lists deleted');
                     
                     // Close dialog
                     const dialog = document.getElementById('mergeDialog');
@@ -3723,8 +3731,18 @@
                     
                     alert(`✅ Created merged list "${mergeName}"\n\n${mergedItemsArray.length} total items\n${selectedLists.length} source lists deleted\n\nItems marked with x2, x3 appear in multiple lists`);
                 } else {
-                    console.error('❌ Merged list created but has no items!');
-                    alert('⚠️ Warning: Merged list was created but may be empty. Check the Shopping tab.');
+                    console.error('❌ Merged list verification failed!');
+                    console.error('Expected items:', mergedItemsArray.length);
+                    console.error('Found in array:', createdList?.items?.length || 0);
+                    alert('⚠️ Warning: Merged list was created but verification failed.\n\nThe list has been created but source lists were NOT deleted to be safe.\n\nPlease check the merged list and manually delete the source lists if needed.');
+                    
+                    // Close dialog
+                    const dialog = document.getElementById('mergeDialog');
+                    if (dialog) dialog.remove();
+                    
+                    // Still open the merged list so user can verify
+                    currentShoppingListId = docRef.id;
+                    openShoppingListToShop(docRef.id);
                 }
             } catch (error) {
                 console.error('❌ Error during merge:', error);
