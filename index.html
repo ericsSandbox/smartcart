@@ -3622,7 +3622,7 @@
             document.body.insertAdjacentHTML('beforeend', modalHtml);
         }
 
-        function confirmMergeSelectedLists() {
+        async function confirmMergeSelectedLists() {
             // Get selected lists
             const selectedCheckboxes = document.querySelectorAll('.merge-list-checkbox:checked');
             
@@ -3637,9 +3637,12 @@
                 return;
             }
 
-            // Get selected list IDs
-            const selectedListIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.value));
+            // Get selected list IDs (keep as strings to match shoppingLists)
+            const selectedListIds = Array.from(selectedCheckboxes).map(cb => cb.value);
             const selectedLists = shoppingLists.filter(l => selectedListIds.includes(l.id));
+
+            console.log('🔀 Merging lists:', selectedLists.map(l => l.name));
+            console.log('📋 Total items before merge:', selectedLists.reduce((sum, l) => sum + (l.items || []).length, 0));
 
             // Merge only selected lists
             const mergedItems = {};  // Track items and which lists they come from
@@ -3668,7 +3671,7 @@
             const mergedItemsArray = Object.values(mergedItems).map((item, idx) => {
                 const count = item.fromLists.size;  // How many of the selected lists have this item
                 return {
-                    id: Date.now() + idx,
+                    id: Date.now() + idx + Math.random(),
                     name: count > 1 ? `${item.name} x${count}` : item.name,
                     quantity: item.quantity,
                     unit: item.unit,
@@ -3683,9 +3686,10 @@
                 return catA.localeCompare(catB);
             });
 
+            console.log('✅ Merged items array:', mergedItemsArray.length, 'items');
+
             // Create new merged list
             const newMergedList = {
-                id: Date.now(),
                 name: mergeName,
                 items: mergedItemsArray,
                 createdAt: new Date().toISOString(),
@@ -3693,20 +3697,39 @@
                 sourceLists: selectedListIds
             };
 
-            // Add merged list to Firebase
-            (async () => {
+            try {
+                // Add merged list to Firebase
                 const docRef = await addShoppingListToFirebase(newMergedList);
-                currentShoppingListId = docRef.id;
+                console.log('💾 Merged list created:', docRef.id);
                 
-                // Close dialog
-                const dialog = document.getElementById('mergeDialog');
-                if (dialog) dialog.remove();
-                
-                // Open the merged list
-                openShoppingListToShop(docRef.id);
-                
-                alert(`✅ Created merged list "${mergeName}"\n\n${mergedItemsArray.length} total items\n${selectedLists.length} lists combined\n\nItems marked with x2, x3 appear in multiple lists`);
-            })();
+                // Verify the list was created with items
+                const createdList = shoppingLists.find(l => l.id === docRef.id);
+                if (createdList && createdList.items && createdList.items.length > 0) {
+                    console.log('✅ Verified merged list has', createdList.items.length, 'items');
+                    
+                    // Now delete source lists
+                    for (const listId of selectedListIds) {
+                        console.log('🗑️ Deleting source list:', listId);
+                        await deleteShoppingListFromFirebase(listId);
+                    }
+                    
+                    // Close dialog
+                    const dialog = document.getElementById('mergeDialog');
+                    if (dialog) dialog.remove();
+                    
+                    // Open the merged list
+                    currentShoppingListId = docRef.id;
+                    openShoppingListToShop(docRef.id);
+                    
+                    alert(`✅ Created merged list "${mergeName}"\n\n${mergedItemsArray.length} total items\n${selectedLists.length} source lists deleted\n\nItems marked with x2, x3 appear in multiple lists`);
+                } else {
+                    console.error('❌ Merged list created but has no items!');
+                    alert('⚠️ Warning: Merged list was created but may be empty. Check the Shopping tab.');
+                }
+            } catch (error) {
+                console.error('❌ Error during merge:', error);
+                alert('Error merging lists: ' + error.message);
+            }
         }
 
         // Toggle shopping category collapse state
