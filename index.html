@@ -53,7 +53,7 @@
             height: 200px;
             object-fit: contain;
             filter: drop-shadow(0 8px 16px rgba(0,0,0,0.3));
-            animation: pulse 0.75s ease-in-out;
+            animation: pulse 2s ease-in-out;
         }
         
         @keyframes zoomOut {
@@ -670,7 +670,7 @@
         let recipesUnsubscribe = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // Hide splash screen after 0.75 seconds with zoom-out animation
+            // Hide splash screen after 2 seconds with zoom-out animation
             setTimeout(() => {
                 const splash = document.getElementById('splash-screen');
                 if (splash) {
@@ -678,7 +678,7 @@
                     // Remove from DOM after animation completes
                     setTimeout(() => splash.remove(), 500);
                 }
-            }, 750);
+            }, 2000);
             
             // Initialize Firebase
             await initFirebase();
@@ -4199,10 +4199,21 @@
                             } else if (recipeImage.startsWith('/')) {
                                 const urlObj = new URL(url);
                                 recipeImage = urlObj.origin + recipeImage;
+                            } else if (!recipeImage.startsWith('http')) {
+                                // Relative path without leading slash (like Gordon Ramsay)
+                                // Try to construct full URL
+                                const urlObj = new URL(url);
+                                // Check if it's a Cloudinary or similar CDN path
+                                if (recipeImage.includes('cloudinary') || recipeImage.match(/^[A-Z]/)) {
+                                    // Looks like a CDN path, try common patterns
+                                    recipeImage = `https://res.cloudinary.com/gordonramsayacademy/image/upload/${recipeImage}`;
+                                } else {
+                                    recipeImage = urlObj.origin + '/' + recipeImage;
+                                }
                             }
                             
                             // Validate it looks like an image URL
-                            if (recipeImage.match(/\.(jpg|jpeg|png|webp|gif)/i) || recipeImage.includes('image')) {
+                            if (recipeImage.match(/\.(jpg|jpeg|png|webp|gif)/i) || recipeImage.includes('image') || recipeImage.includes('cloudinary')) {
                                 console.log(`✅ Found image with "${selector}":`, recipeImage);
                                 break;
                             } else {
@@ -4320,6 +4331,22 @@
                                     } else if (recipe.image.url) {
                                         recipeImage = recipe.image.url;
                                     }
+                                    
+                                    // Fix relative/partial URLs in JSON-LD
+                                    if (recipeImage && !recipeImage.startsWith('http')) {
+                                        if (recipeImage.startsWith('//')) {
+                                            recipeImage = 'https:' + recipeImage;
+                                        } else if (recipeImage.startsWith('/')) {
+                                            const urlObj = new URL(url);
+                                            recipeImage = urlObj.origin + recipeImage;
+                                        } else {
+                                            // Cloudinary or partial path
+                                            if (recipeImage.includes('cloudinary') || recipeImage.match(/^[A-Z]/)) {
+                                                recipeImage = `https://res.cloudinary.com/gordonramsayacademy/image/upload/${recipeImage}`;
+                                            }
+                                        }
+                                    }
+                                    console.log(`✅ Got image from JSON-LD:`, recipeImage);
                                 }
                                 
                                 // Get ingredients if we don't have them
