@@ -4222,7 +4222,12 @@
                 
                 // Method 1: Look for ingredient lists by common selectors
                 const ingredientSelectors = [
-                    // Gordon Ramsay Academy specific
+                    // Gordon Ramsay Academy specific (React module classes)
+                    '[class*="IngredientsContent"] li',
+                    '[class*="IngredientsContent"] p',
+                    '[class*="RecipeDetails"][class*="Ingredients"] li',
+                    '[class*="RecipeDetails"][class*="Ingredients"] p',
+                    // Generic Gordon Ramsay patterns
                     '.recipe-ingredients ul li',
                     '.ingredients-list li',
                     'div[class*="ingredient"] li',
@@ -4319,8 +4324,16 @@
                                 
                                 // Get ingredients if we don't have them
                                 if (ingredients.length === 0 && recipe.recipeIngredient) {
-                                    ingredients = recipe.recipeIngredient.map(ing => parseIngredientLine(ing));
-                                    console.log(`✅ Got ${ingredients.length} ingredients from JSON-LD`);
+                                    // Handle both array and single string formats
+                                    if (Array.isArray(recipe.recipeIngredient)) {
+                                        ingredients = recipe.recipeIngredient.map(ing => parseIngredientLine(ing));
+                                        console.log(`✅ Got ${ingredients.length} ingredients from JSON-LD (array)`);
+                                    } else if (typeof recipe.recipeIngredient === 'string') {
+                                        ingredients = [parseIngredientLine(recipe.recipeIngredient)];
+                                        console.log(`✅ Got 1 ingredient from JSON-LD (string)`);
+                                    } else {
+                                        console.log('⚠️ recipeIngredient is neither array nor string:', typeof recipe.recipeIngredient);
+                                    }
                                 }
                                 
                                 if (recipeName || ingredients.length > 0 || recipeImage) break;
