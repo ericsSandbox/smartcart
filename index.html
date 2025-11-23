@@ -4092,6 +4092,9 @@
 
         // Scrape recipe from URL using a CORS proxy
         async function scrapeRecipe(url) {
+            console.log('🔍 ===== RECIPE SCRAPER DEBUG =====');
+            console.log('📍 Target URL:', url);
+            
             try {
                 // Try multiple CORS proxies in order of preference
                 const proxies = [
@@ -4106,14 +4109,15 @@
                 // Try each proxy until one works
                 for (const proxyUrl of proxies) {
                     try {
-                        console.log('Trying proxy:', proxyUrl.split('?')[0]);
+                        console.log('🔄 Trying proxy:', proxyUrl.split('?')[0]);
                         const response = await fetch(proxyUrl);
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
                         html = await response.text();
-                        console.log('✅ Successfully fetched with proxy');
+                        console.log('✅ Successfully fetched HTML');
+                        console.log('📏 HTML length:', html.length, 'characters');
                         break;
                     } catch (e) {
-                        console.warn('Proxy failed:', e.message);
+                        console.warn('❌ Proxy failed:', e.message);
                         lastError = e;
                         continue;
                     }
@@ -4126,11 +4130,13 @@
                 // Parse HTML
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
+                console.log('📄 HTML parsed successfully');
                 
                 // Try to extract recipe name from various common selectors
                 let recipeName = null;
                 let recipeImage = null;
                 
+                console.log('🔍 Searching for recipe title...');
                 const titleSelectors = [
                     'h1[class*="recipe"]',
                     'h1[class*="title"]',
@@ -4148,11 +4154,19 @@
                     const element = doc.querySelector(selector);
                     if (element && element.textContent.trim()) {
                         recipeName = element.textContent.trim();
+                        console.log(`✅ Found title with "${selector}":`, recipeName);
                         break;
+                    } else if (element) {
+                        console.log(`⚠️ Found "${selector}" but no text content`);
                     }
                 }
                 
+                if (!recipeName) {
+                    console.log('❌ No recipe title found');
+                }
+                
                 // Try to extract recipe image
+                console.log('🔍 Searching for recipe image...');
                 const imageSelectors = [
                     'meta[property="og:image"]', // Try this first - most reliable
                     'img[class*="recipe"]',
@@ -4189,14 +4203,21 @@
                             
                             // Validate it looks like an image URL
                             if (recipeImage.match(/\.(jpg|jpeg|png|webp|gif)/i) || recipeImage.includes('image')) {
-                                console.log('Found recipe image:', recipeImage);
+                                console.log(`✅ Found image with "${selector}":`, recipeImage);
                                 break;
+                            } else {
+                                console.log(`⚠️ Found image with "${selector}" but invalid URL:`, recipeImage);
                             }
                         }
                     }
                 }
                 
+                if (!recipeImage) {
+                    console.log('❌ No recipe image found');
+                }
+                
                 // Try to extract ingredients from various common structures
+                console.log('🔍 Searching for ingredients...');
                 let ingredients = [];
                 
                 // Method 1: Look for ingredient lists by common selectors
@@ -4223,6 +4244,20 @@
                     'div[class*="ingredient"] ul li',
                     '[class*="recipe-ingredient"] li'
                 ];
+                
+                // Debug: Log all classes and IDs in the document for inspection
+                console.log('📋 Document structure debug:');
+                const allElements = doc.querySelectorAll('*');
+                const classes = new Set();
+                const ids = new Set();
+                allElements.forEach(el => {
+                    if (el.className && typeof el.className === 'string') {
+                        el.className.split(' ').forEach(c => c && classes.add(c));
+                    }
+                    if (el.id) ids.add(el.id);
+                });
+                console.log('Found classes:', Array.from(classes).filter(c => c.toLowerCase().includes('ingredient') || c.toLowerCase().includes('recipe')).join(', '));
+                console.log('Found IDs:', Array.from(ids).filter(id => id.toLowerCase().includes('ingredient') || id.toLowerCase().includes('recipe')).join(', '));
                 
                 for (const selector of ingredientSelectors) {
                     const elements = doc.querySelectorAll(selector);
@@ -4252,7 +4287,10 @@
                 
                 // Method 2: Look for JSON-LD structured data
                 if (ingredients.length === 0 || !recipeName || !recipeImage) {
+                    console.log('🔍 Trying JSON-LD structured data...');
                     const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+                    console.log(`Found ${jsonLdScripts.length} JSON-LD script(s)`);
+                    
                     for (const script of jsonLdScripts) {
                         try {
                             const data = JSON.parse(script.textContent);
@@ -4260,9 +4298,12 @@
                                           data['@type'] === 'Recipe' ? data : null;
                             
                             if (recipe) {
+                                console.log('✅ Found Recipe in JSON-LD:', recipe);
+                                
                                 // Get name if we don't have it
                                 if (!recipeName && recipe.name) {
                                     recipeName = recipe.name;
+                                    console.log('✅ Got name from JSON-LD:', recipeName);
                                 }
                                 
                                 // Get image if we don't have it
@@ -4279,16 +4320,28 @@
                                 // Get ingredients if we don't have them
                                 if (ingredients.length === 0 && recipe.recipeIngredient) {
                                     ingredients = recipe.recipeIngredient.map(ing => parseIngredientLine(ing));
-                                    console.log(`Found ${ingredients.length} ingredients from JSON-LD`);
+                                    console.log(`✅ Got ${ingredients.length} ingredients from JSON-LD`);
                                 }
                                 
                                 if (recipeName || ingredients.length > 0 || recipeImage) break;
+                            } else {
+                                console.log('⚠️ JSON-LD found but no Recipe type');
                             }
                         } catch (e) {
-                            // Skip invalid JSON
+                            console.warn('⚠️ Failed to parse JSON-LD:', e.message);
                         }
                     }
                 }
+                
+                // Final summary
+                console.log('📊 ===== SCRAPING RESULTS =====');
+                console.log('Recipe Name:', recipeName || '❌ NOT FOUND');
+                console.log('Recipe Image:', recipeImage || '❌ NOT FOUND');
+                console.log('Ingredients:', ingredients.length > 0 ? `✅ ${ingredients.length} found` : '❌ NOT FOUND');
+                if (ingredients.length > 0) {
+                    console.log('First 5 ingredients:', ingredients.slice(0, 5).map(i => i.name || i.quantity));
+                }
+                console.log('🔍 ===== END DEBUG =====');
                 
                 return {
                     name: recipeName,
@@ -4297,7 +4350,8 @@
                 };
                 
             } catch (error) {
-                console.error('Error scraping recipe:', error);
+                console.error('❌ Error scraping recipe:', error);
+                console.error('Stack trace:', error.stack);
                 return null;
             }
         }
