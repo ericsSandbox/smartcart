@@ -55,12 +55,20 @@ header h1 {
 }
 
 .tab-btn.active {
-    background: white;
-    color: #1e40af;
+    background: white !important;
+    color: #667eea !important;
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+}
+
+.tab-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 .tab-btn:active {
     opacity: 0.8;
+    transform: scale(0.98);
 }
 
 .container {
