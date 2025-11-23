@@ -34,6 +34,7 @@
         <div class="tab-nav">
             <button class="tab-btn active" data-tab="pantry">📦 Pantry</button>
             <button class="tab-btn" data-tab="shopping">🛍️ Shopping</button>
+            <button class="tab-btn" data-tab="recipes">🍽️ Meals</button>
             <button class="tab-btn" data-tab="members">🏠 Home</button>
         </div>
     </header>
@@ -175,6 +176,36 @@
             <div class="empty-state" id="emptyMembersState">
                 <div class="icon">👥</div>
                 <p>No members added yet</p>
+            </div>
+        </div>
+
+        <!-- RECIPES / MEAL PLANNING TAB -->
+        <div class="tab-content" id="recipes">
+            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #fbbf24; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                <div style="font-weight: 600; color: #78350f; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; font-size: 16px;">
+                    🍽️ Meal Planning
+                </div>
+                <div style="font-size: 13px; color: #92400e;">
+                    Save your favorite recipe URLs. We'll extract ingredients and check your pantry!
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="recipeUrlInput" placeholder="🔗 Paste recipe URL or enter recipe name..." 
+                       style="margin-bottom: 8px;">
+                <textarea id="recipeIngredientsInput" rows="6" placeholder="Optional: Paste ingredients list here (one per line)&#10;e.g.&#10;2 cups flour&#10;1 cup milk&#10;3 eggs"
+                          style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-family: inherit; margin-bottom: 8px; resize: vertical;"></textarea>
+                <button onclick="addRecipe()" class="btn btn-primary" style="width: 100%;">
+                    ➕ Save Recipe
+                </button>
+            </div>
+
+            <div class="section-title">Saved Recipes (<span id="recipeCount">0</span>)</div>
+            <div id="recipesList"></div>
+            <div class="empty-state" id="emptyRecipesState">
+                <div class="icon">🍽️</div>
+                <p>No recipes saved yet</p>
+                <small style="color: #9ca3af;">Add a recipe URL to get started!</small>
             </div>
         </div>
     </div>
@@ -550,6 +581,7 @@
         let pantryItems = [];
         let shoppingLists = [];
         let members = [];
+        let recipes = [];
         let scannerActive = false;
         let lastDetectedBarcode = null;
         
@@ -557,6 +589,7 @@
         let pantryUnsubscribe = null;
         let shoppingUnsubscribe = null;
         let membersUnsubscribe = null;
+        let recipesUnsubscribe = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
             // Initialize Firebase
@@ -624,6 +657,20 @@
                 }, (error) => {
                     console.error('Members listener error:', error);
                 });
+            
+            // Listen to recipes changes in real-time
+            recipesUnsubscribe = db.collection('households').doc(householdId)
+                .collection('recipes')
+                .onSnapshot((snapshot) => {
+                    recipes = [];
+                    snapshot.forEach((doc) => {
+                        recipes.push({ id: doc.id, ...doc.data() });
+                    });
+                    console.log('🔄 Recipes updated:', recipes.length, 'recipes');
+                    renderUI();
+                }, (error) => {
+                    console.error('Recipes listener error:', error);
+                });
         }
 
         async function loadData() {
@@ -648,8 +695,13 @@
                     .collection('members').get();
                 members = membersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
+                // Load recipes
+                const recipesSnapshot = await db.collection('households').doc(householdId)
+                    .collection('recipes').get();
+                recipes = recipesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
                 console.log('📦 Initial load complete:', pantryItems.length, 'pantry,', 
-                           shoppingLists.length, 'lists,', members.length, 'members');
+                           shoppingLists.length, 'lists,', members.length, 'members,', recipes.length, 'recipes');
             } catch (error) {
                 console.error('Error loading data:', error);
             }
@@ -784,6 +836,38 @@
                 return true;
             } catch (error) {
                 console.error('Error deleting member:', error);
+                return false;
+            }
+        }
+
+        // Recipe operations
+        async function addRecipeToFirebase(recipe) {
+            if (!db || !householdId) return null;
+            try {
+                const docRef = await db.collection('households').doc(householdId)
+                    .collection('recipes').add({
+                        name: recipe.name,
+                        url: recipe.url || null,
+                        ingredients: recipe.ingredients || [],
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                console.log('✅ Recipe added:', docRef.id);
+                return docRef.id;
+            } catch (error) {
+                console.error('Error adding recipe:', error);
+                return null;
+            }
+        }
+
+        async function deleteRecipeFromFirebase(recipeId) {
+            if (!db || !householdId) return false;
+            try {
+                await db.collection('households').doc(householdId)
+                    .collection('recipes').doc(recipeId).delete();
+                console.log('✅ Recipe deleted:', recipeId);
+                return true;
+            } catch (error) {
+                console.error('Error deleting recipe:', error);
                 return false;
             }
         }
@@ -2778,6 +2862,7 @@
             }
             renderShopping();
             renderMembers();
+            renderRecipes();
         }
 
         function togglePantryView() {
@@ -3752,6 +3837,201 @@
                     </div>
                 `).join('');
             }
+        }
+
+        // ===== RECIPE / MEAL PLANNING FUNCTIONS =====
+        
+        function renderRecipes() {
+            const recipeCount = document.getElementById('recipeCount');
+            const recipesList = document.getElementById('recipesList');
+            const emptyState = document.getElementById('emptyRecipesState');
+            
+            if (recipeCount) recipeCount.textContent = recipes.length;
+            
+            if (recipes.length === 0) {
+                if (emptyState) emptyState.style.display = 'block';
+                if (recipesList) recipesList.innerHTML = '';
+            } else {
+                if (emptyState) emptyState.style.display = 'none';
+                if (recipesList) {
+                    recipesList.innerHTML = recipes.map(recipe => `
+                        <div class="recipe-card">
+                            <div class="recipe-card-header">
+                                <div class="recipe-card-title">${recipe.name || 'Untitled Recipe'}</div>
+                            </div>
+                            ${recipe.url ? `<div class="recipe-card-meta">🔗 ${recipe.url}</div>` : ''}
+                            ${recipe.ingredients && recipe.ingredients.length > 0 ? 
+                                `<div class="recipe-card-meta">📝 ${recipe.ingredients.length} ingredients</div>` : 
+                                '<div class="recipe-card-meta" style="color: #ef4444;">⚠️ No ingredients saved</div>'}
+                            <div class="recipe-card-actions">
+                                ${recipe.url ? `<button class="recipe-btn-open" onclick="openRecipe('${recipe.id}')">🌐 Open</button>` : ''}
+                                <button class="recipe-btn-add" onclick="addRecipeToShoppingList('${recipe.id}')">🛒 Add List</button>
+                                <button class="recipe-btn-delete" onclick="deleteRecipe('${recipe.id}')">🗑️</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        async function addRecipe() {
+            const urlInput = document.getElementById('recipeUrlInput');
+            const ingredientsInput = document.getElementById('recipeIngredientsInput');
+            
+            const url = urlInput.value.trim();
+            const ingredientsText = ingredientsInput.value.trim();
+            
+            if (!url && !ingredientsText) {
+                alert('Please enter a recipe URL or paste ingredients');
+                return;
+            }
+            
+            // Extract recipe name from URL or use default
+            let recipeName = 'My Recipe';
+            if (url) {
+                try {
+                    const urlObj = new URL(url);
+                    recipeName = urlObj.hostname.replace('www.', '') + ' Recipe';
+                } catch (e) {
+                    recipeName = url.substring(0, 30);
+                }
+            }
+            
+            // Parse ingredients from text
+            const ingredients = ingredientsText
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .map(line => {
+                    // Try to extract quantity and item name
+                    const match = line.match(/^([\d./]+\s*(?:cups?|tbsp?|tsp?|oz|lb|g|kg|ml|l)?\s*)(.+)$/i);
+                    if (match) {
+                        return {
+                            quantity: match[1].trim(),
+                            name: match[2].trim()
+                        };
+                    }
+                    return {
+                        quantity: '',
+                        name: line
+                    };
+                });
+            
+            const recipe = {
+                name: recipeName,
+                url: url || null,
+                ingredients: ingredients
+            };
+            
+            await addRecipeToFirebase(recipe);
+            
+            // Clear inputs
+            urlInput.value = '';
+            ingredientsInput.value = '';
+            
+            alert(`✅ Recipe "${recipeName}" saved!`);
+        }
+
+        function openRecipe(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe || !recipe.url) return;
+            
+            window.open(recipe.url, '_blank');
+        }
+
+        async function addRecipeToShoppingList(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+            
+            if (!recipe.ingredients || recipe.ingredients.length === 0) {
+                alert('⚠️ This recipe has no ingredients saved.\n\nPlease edit the recipe and add ingredients first.');
+                return;
+            }
+            
+            // Check which ingredients are already in pantry
+            const missingIngredients = [];
+            const availableIngredients = [];
+            
+            recipe.ingredients.forEach(ingredient => {
+                const ingredientName = ingredient.name.toLowerCase();
+                const inPantry = pantryItems.some(item => {
+                    const itemName = item.name.toLowerCase();
+                    return itemName.includes(ingredientName) || ingredientName.includes(itemName);
+                });
+                
+                if (inPantry) {
+                    availableIngredients.push(ingredient);
+                } else {
+                    missingIngredients.push(ingredient);
+                }
+            });
+            
+            // Check if all ingredients are in pantry
+            if (missingIngredients.length === 0) {
+                // CONFETTI TIME! 🎉
+                showConfetti();
+                alert(`🎉 Congratulations! 🎉\n\nYou have ALL ${recipe.ingredients.length} ingredients for "${recipe.name}" in your pantry!\n\nYou're ready to cook!`);
+                return;
+            }
+            
+            // Create shopping list with missing ingredients
+            const listName = `🍽️ ${recipe.name}`;
+            const shoppingListItems = missingIngredients.map((ingredient, index) => ({
+                id: Date.now() + index,
+                name: ingredient.name,
+                quantity: ingredient.quantity || '1',
+                unit: '',
+                checked: false
+            }));
+            
+            const newList = {
+                name: listName,
+                items: shoppingListItems,
+                createdAt: new Date().toISOString()
+            };
+            
+            await addShoppingListToFirebase(newList);
+            
+            const msg = `✅ Created shopping list "${listName}"\n\n` +
+                        `📝 ${missingIngredients.length} ingredients needed\n` +
+                        `✅ ${availableIngredients.length} already in pantry`;
+            alert(msg);
+            
+            // Switch to shopping tab
+            switchTab('shopping');
+        }
+
+        async function deleteRecipe(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+            
+            if (confirm(`Delete recipe "${recipe.name}"?`)) {
+                await deleteRecipeFromFirebase(recipeId);
+            }
+        }
+
+        function showConfetti() {
+            const container = document.createElement('div');
+            container.className = 'confetti-container';
+            document.body.appendChild(container);
+            
+            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#ff1493'];
+            
+            // Create 100 confetti pieces
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                container.appendChild(confetti);
+            }
+            
+            // Remove confetti after animation
+            setTimeout(() => {
+                container.remove();
+            }, 4000);
         }
 
         // ===== SERVICE WORKER REGISTRATION =====

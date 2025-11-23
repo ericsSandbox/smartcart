@@ -651,3 +651,108 @@ select:focus {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
 }
+
+/* Confetti Animation */
+.confetti-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #f00;
+    animation: confetti-fall 3s linear forwards;
+}
+
+@keyframes confetti-fall {
+    0% {
+        transform: translateY(-100vh) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+.recipe-card {
+    background: white;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border-left: 4px solid #fbbf24;
+}
+
+.recipe-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.recipe-card-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: #111827;
+    flex: 1;
+    line-height: 1.4;
+}
+
+.recipe-card-meta {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 10px;
+}
+
+.recipe-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.recipe-card-actions button {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.recipe-btn-open {
+    background: #3b82f6;
+    color: white;
+}
+
+.recipe-btn-add {
+    background: #10b981;
+    color: white;
+}
+
+.recipe-btn-delete {
+    background: #ef4444;
+    color: white;
+    flex: 0;
+    padding: 8px 10px;
+}
+
+.recipe-btn-open:active {
+    background: #2563eb;
+}
+
+.recipe-btn-add:active {
+    background: #059669;
+}
+
+.recipe-btn-delete:active {
+    background: #dc2626;
+}
