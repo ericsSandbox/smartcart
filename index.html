@@ -3992,13 +3992,35 @@
         // Scrape recipe from URL using a CORS proxy
         async function scrapeRecipe(url) {
             try {
-                // Use AllOrigins CORS proxy to fetch the page
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                // Try multiple CORS proxies in order of preference
+                const proxies = [
+                    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+                    `https://cors-anywhere.herokuapp.com/${url}`
+                ];
                 
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('Failed to fetch recipe');
+                let html = null;
+                let lastError = null;
                 
-                const html = await response.text();
+                // Try each proxy until one works
+                for (const proxyUrl of proxies) {
+                    try {
+                        console.log('Trying proxy:', proxyUrl.split('?')[0]);
+                        const response = await fetch(proxyUrl);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        html = await response.text();
+                        console.log('✅ Successfully fetched with proxy');
+                        break;
+                    } catch (e) {
+                        console.warn('Proxy failed:', e.message);
+                        lastError = e;
+                        continue;
+                    }
+                }
+                
+                if (!html) {
+                    throw new Error('All CORS proxies failed: ' + lastError?.message);
+                }
                 
                 // Parse HTML
                 const parser = new DOMParser();
@@ -4072,6 +4094,11 @@
                 
                 // Method 1: Look for ingredient lists by common selectors
                 const ingredientSelectors = [
+                    // AllRecipes specific
+                    '[data-ingredient-name]',
+                    '.mntl-structured-ingredients__list li',
+                    '.ingredients-item',
+                    // Generic selectors
                     '.recipe-ingredients li',
                     '.ingredients li',
                     '[itemprop="recipeIngredient"]',
@@ -4086,7 +4113,16 @@
                     const elements = doc.querySelectorAll(selector);
                     if (elements.length > 0) {
                         ingredients = Array.from(elements)
-                            .map(el => el.textContent.trim())
+                            .map(el => {
+                                // For AllRecipes, get data attribute if available
+                                if (el.hasAttribute('data-ingredient-name')) {
+                                    const qty = el.getAttribute('data-ingredient-quantity') || '';
+                                    const unit = el.getAttribute('data-ingredient-unit') || '';
+                                    const name = el.getAttribute('data-ingredient-name') || '';
+                                    return `${qty} ${unit} ${name}`.trim();
+                                }
+                                return el.textContent.trim();
+                            })
                             .filter(text => text.length > 0 && text.length < 200)
                             .map(text => parseIngredientLine(text));
                         
