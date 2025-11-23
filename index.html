@@ -848,6 +848,7 @@
                     .collection('recipes').add({
                         name: recipe.name,
                         url: recipe.url || null,
+                        image: recipe.image || null,
                         ingredients: recipe.ingredients || [],
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
@@ -3856,10 +3857,18 @@
                 if (recipesList) {
                     recipesList.innerHTML = recipes.map(recipe => `
                         <div class="recipe-card">
+                            ${recipe.image ? `
+                                <div style="width: 100%; height: 160px; margin-bottom: 12px; border-radius: 8px; overflow: hidden;">
+                                    <img src="${recipe.image}" 
+                                         alt="${recipe.name || 'Recipe'}" 
+                                         style="width: 100%; height: 100%; object-fit: cover;"
+                                         onerror="this.parentElement.style.display='none'">
+                                </div>
+                            ` : ''}
                             <div class="recipe-card-header">
                                 <div class="recipe-card-title">${recipe.name || 'Untitled Recipe'}</div>
                             </div>
-                            ${recipe.url ? `<div class="recipe-card-meta">🔗 ${recipe.url}</div>` : ''}
+                            ${recipe.url ? `<div class="recipe-card-meta">🔗 ${new URL(recipe.url).hostname.replace('www.', '')}</div>` : ''}
                             ${recipe.ingredients && recipe.ingredients.length > 0 ? 
                                 `<div class="recipe-card-meta">📝 ${recipe.ingredients.length} ingredients</div>` : 
                                 '<div class="recipe-card-meta" style="color: #ef4444;">⚠️ No ingredients saved</div>'}
@@ -3879,47 +3888,95 @@
             const ingredientsInput = document.getElementById('recipeIngredientsInput');
             
             const url = urlInput.value.trim();
-            const ingredientsText = ingredientsInput.value.trim();
+            let ingredientsText = ingredientsInput.value.trim();
             
             if (!url && !ingredientsText) {
                 alert('Please enter a recipe URL or paste ingredients');
                 return;
             }
             
-            // Extract recipe name from URL or use default
             let recipeName = 'My Recipe';
+            let recipeImage = null;
+            let ingredients = [];
+            
+            // If URL provided, try to scrape it
             if (url) {
                 try {
-                    const urlObj = new URL(url);
-                    recipeName = urlObj.hostname.replace('www.', '') + ' Recipe';
+                    alert('🔍 Scraping recipe from URL...\n\nThis may take a few seconds.');
+                    const scrapedData = await scrapeRecipe(url);
+                    
+                    if (scrapedData) {
+                        // Use scraped name if available
+                        if (scrapedData.name && scrapedData.name.trim()) {
+                            recipeName = scrapedData.name;
+                        }
+                        
+                        // Use scraped image if available
+                        if (scrapedData.image) {
+                            recipeImage = scrapedData.image;
+                        }
+                        
+                        // If scraping found ingredients, use those (unless user manually entered some)
+                        if (scrapedData.ingredients && scrapedData.ingredients.length > 0 && !ingredientsText) {
+                            ingredients = scrapedData.ingredients;
+                            alert(`✅ Found recipe: "${recipeName}"\n${ingredients.length} ingredients extracted!`);
+                        } else if (!ingredientsText) {
+                            alert('⚠️ Could not automatically extract ingredients.\n\nPlease paste them manually in the text area.');
+                            return;
+                        }
+                    }
+                    
+                    // Extract recipe name from URL as last resort if scraping didn't get it
+                    if (recipeName === 'My Recipe' || !recipeName) {
+                        const urlObj = new URL(url);
+                        const pathname = urlObj.pathname;
+                        // Try to extract from URL path (e.g., /recipe/moores-cranberry-gelatin-salad/)
+                        const pathParts = pathname.split('/').filter(p => p && p !== 'recipe' && p !== 'recipes');
+                        if (pathParts.length > 0) {
+                            recipeName = pathParts[pathParts.length - 1]
+                                .replace(/-/g, ' ')
+                                .replace(/\b\w/g, l => l.toUpperCase());
+                        } else {
+                            recipeName = urlObj.hostname.replace('www.', '') + ' Recipe';
+                        }
+                    }
                 } catch (e) {
-                    recipeName = url.substring(0, 30);
+                    console.error('Scraping failed:', e);
+                    alert('⚠️ Could not scrape recipe automatically.\n\nPlease paste ingredients manually.');
+                    if (!ingredientsText) return;
                 }
             }
             
-            // Parse ingredients from text
-            const ingredients = ingredientsText
-                .split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0)
-                .map(line => {
-                    // Try to extract quantity and item name
-                    const match = line.match(/^([\d./]+\s*(?:cups?|tbsp?|tsp?|oz|lb|g|kg|ml|l)?\s*)(.+)$/i);
-                    if (match) {
+            // Parse manually entered ingredients if any
+            if (ingredientsText && ingredients.length === 0) {
+                ingredients = ingredientsText
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0)
+                    .map(line => {
+                        // Try to extract quantity and item name
+                        const match = line.match(/^([\d./]+\s*(?:cups?|tbsp?|tsp?|oz|lb|g|kg|ml|l)?\s*)(.+)$/i);
+                        if (match) {
+                            return {
+                                quantity: match[1].trim(),
+                                name: match[2].trim()
+                            };
+                        }
                         return {
-                            quantity: match[1].trim(),
-                            name: match[2].trim()
+                            quantity: '',
+                            name: line
                         };
-                    }
-                    return {
-                        quantity: '',
-                        name: line
-                    };
-                });
+                    });
+            }
+            
+            if (ingredients.length === 0) {
+                alert('⚠️ No ingredients found or entered.\n\nRecipe will be saved, but you\'ll need to add ingredients later.');
+            }
             
             const recipe = {
                 name: recipeName,
                 url: url || null,
+                image: recipeImage || null,
                 ingredients: ingredients
             };
             
@@ -3929,7 +3986,191 @@
             urlInput.value = '';
             ingredientsInput.value = '';
             
-            alert(`✅ Recipe "${recipeName}" saved!`);
+            alert(`✅ Recipe "${recipeName}" saved with ${ingredients.length} ingredients!`);
+        }
+
+        // Scrape recipe from URL using a CORS proxy
+        async function scrapeRecipe(url) {
+            try {
+                // Use AllOrigins CORS proxy to fetch the page
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('Failed to fetch recipe');
+                
+                const html = await response.text();
+                
+                // Parse HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Try to extract recipe name from various common selectors
+                let recipeName = null;
+                let recipeImage = null;
+                
+                const titleSelectors = [
+                    'h1[class*="recipe"]',
+                    'h1[class*="title"]',
+                    '.recipe-title',
+                    '.recipe-name',
+                    '[itemprop="name"]',
+                    '.tasty-recipes-title',
+                    'h1'
+                ];
+                
+                for (const selector of titleSelectors) {
+                    const element = doc.querySelector(selector);
+                    if (element && element.textContent.trim()) {
+                        recipeName = element.textContent.trim();
+                        break;
+                    }
+                }
+                
+                // Try to extract recipe image
+                const imageSelectors = [
+                    'img[class*="recipe"]',
+                    '.recipe-image img',
+                    '[itemprop="image"]',
+                    '.tasty-recipes-image img',
+                    'img[class*="hero"]',
+                    'img[class*="featured"]',
+                    '.wprm-recipe-image img',
+                    'meta[property="og:image"]'
+                ];
+                
+                for (const selector of imageSelectors) {
+                    const element = doc.querySelector(selector);
+                    if (element) {
+                        // For meta tags, get content attribute
+                        if (element.tagName === 'META') {
+                            recipeImage = element.getAttribute('content');
+                        } else {
+                            // For img tags, get src or data-src
+                            recipeImage = element.getAttribute('src') || element.getAttribute('data-src');
+                        }
+                        
+                        // Make sure it's a valid URL
+                        if (recipeImage) {
+                            if (recipeImage.startsWith('//')) {
+                                recipeImage = 'https:' + recipeImage;
+                            } else if (recipeImage.startsWith('/')) {
+                                const urlObj = new URL(url);
+                                recipeImage = urlObj.origin + recipeImage;
+                            }
+                            
+                            // Validate it looks like an image URL
+                            if (recipeImage.match(/\.(jpg|jpeg|png|webp|gif)/i) || recipeImage.includes('image')) {
+                                console.log('Found recipe image:', recipeImage);
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Try to extract ingredients from various common structures
+                let ingredients = [];
+                
+                // Method 1: Look for ingredient lists by common selectors
+                const ingredientSelectors = [
+                    '.recipe-ingredients li',
+                    '.ingredients li',
+                    '[itemprop="recipeIngredient"]',
+                    '.ingredient',
+                    '.tasty-recipes-ingredients li',
+                    'ul.ingredients li',
+                    'li[class*="ingredient"]',
+                    '.wprm-recipe-ingredient'
+                ];
+                
+                for (const selector of ingredientSelectors) {
+                    const elements = doc.querySelectorAll(selector);
+                    if (elements.length > 0) {
+                        ingredients = Array.from(elements)
+                            .map(el => el.textContent.trim())
+                            .filter(text => text.length > 0 && text.length < 200)
+                            .map(text => parseIngredientLine(text));
+                        
+                        if (ingredients.length > 0) {
+                            console.log(`Found ${ingredients.length} ingredients using selector: ${selector}`);
+                            break;
+                        }
+                    }
+                }
+                
+                // Method 2: Look for JSON-LD structured data
+                if (ingredients.length === 0 || !recipeName || !recipeImage) {
+                    const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+                    for (const script of jsonLdScripts) {
+                        try {
+                            const data = JSON.parse(script.textContent);
+                            const recipe = Array.isArray(data) ? data.find(d => d['@type'] === 'Recipe') : 
+                                          data['@type'] === 'Recipe' ? data : null;
+                            
+                            if (recipe) {
+                                // Get name if we don't have it
+                                if (!recipeName && recipe.name) {
+                                    recipeName = recipe.name;
+                                }
+                                
+                                // Get image if we don't have it
+                                if (!recipeImage && recipe.image) {
+                                    if (typeof recipe.image === 'string') {
+                                        recipeImage = recipe.image;
+                                    } else if (Array.isArray(recipe.image)) {
+                                        recipeImage = recipe.image[0];
+                                    } else if (recipe.image.url) {
+                                        recipeImage = recipe.image.url;
+                                    }
+                                }
+                                
+                                // Get ingredients if we don't have them
+                                if (ingredients.length === 0 && recipe.recipeIngredient) {
+                                    ingredients = recipe.recipeIngredient.map(ing => parseIngredientLine(ing));
+                                    console.log(`Found ${ingredients.length} ingredients from JSON-LD`);
+                                }
+                                
+                                if (recipeName || ingredients.length > 0 || recipeImage) break;
+                            }
+                        } catch (e) {
+                            // Skip invalid JSON
+                        }
+                    }
+                }
+                
+                return {
+                    name: recipeName,
+                    ingredients: ingredients,
+                    image: recipeImage
+                };
+                
+            } catch (error) {
+                console.error('Error scraping recipe:', error);
+                return null;
+            }
+        }
+
+        function parseIngredientLine(line) {
+            // Clean up the line
+            line = line.trim()
+                .replace(/^[•\-\*]\s*/, '') // Remove bullet points
+                .replace(/\s+/g, ' '); // Normalize whitespace
+            
+            // Try to extract quantity and item name
+            // Matches patterns like: "2 cups flour", "1/2 tsp salt", "3 large eggs"
+            const match = line.match(/^([\d\/.]+\s*(?:cups?|tablespoons?|tbsp?|teaspoons?|tsp?|ounces?|oz|pounds?|lbs?|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|large|medium|small|whole|cloves?|cans?)?\s*)(.+)$/i);
+            
+            if (match) {
+                return {
+                    quantity: match[1].trim(),
+                    name: match[2].trim()
+                };
+            }
+            
+            // If no quantity found, treat entire line as ingredient name
+            return {
+                quantity: '',
+                name: line
+            };
         }
 
         function openRecipe(recipeId) {
