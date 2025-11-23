@@ -4072,6 +4072,9 @@
                     '.recipe-name',
                     '[itemprop="name"]',
                     '.tasty-recipes-title',
+                    'article h1',
+                    'main h1',
+                    '.entry-title',
                     'h1'
                 ];
                 
@@ -4085,6 +4088,7 @@
                 
                 // Try to extract recipe image
                 const imageSelectors = [
+                    'meta[property="og:image"]', // Try this first - most reliable
                     'img[class*="recipe"]',
                     '.recipe-image img',
                     '[itemprop="image"]',
@@ -4092,7 +4096,9 @@
                     'img[class*="hero"]',
                     'img[class*="featured"]',
                     '.wprm-recipe-image img',
-                    'meta[property="og:image"]'
+                    'article img',
+                    'main img',
+                    '.entry-content img'
                 ];
                 
                 for (const selector of imageSelectors) {
@@ -4129,6 +4135,10 @@
                 
                 // Method 1: Look for ingredient lists by common selectors
                 const ingredientSelectors = [
+                    // Gordon Ramsay Academy specific
+                    '.recipe-ingredients ul li',
+                    '.ingredients-list li',
+                    'div[class*="ingredient"] li',
                     // AllRecipes specific
                     '[data-ingredient-name]',
                     '.mntl-structured-ingredients__list li',
@@ -4141,12 +4151,17 @@
                     '.tasty-recipes-ingredients li',
                     'ul.ingredients li',
                     'li[class*="ingredient"]',
-                    '.wprm-recipe-ingredient'
+                    '.wprm-recipe-ingredient',
+                    // More generic patterns
+                    'section[class*="ingredient"] li',
+                    'div[class*="ingredient"] ul li',
+                    '[class*="recipe-ingredient"] li'
                 ];
                 
                 for (const selector of ingredientSelectors) {
                     const elements = doc.querySelectorAll(selector);
                     if (elements.length > 0) {
+                        console.log(`Testing selector "${selector}": found ${elements.length} elements`);
                         ingredients = Array.from(elements)
                             .map(el => {
                                 // For AllRecipes, get data attribute if available
@@ -4162,7 +4177,8 @@
                             .map(text => parseIngredientLine(text));
                         
                         if (ingredients.length > 0) {
-                            console.log(`Found ${ingredients.length} ingredients using selector: ${selector}`);
+                            console.log(`✅ Found ${ingredients.length} ingredients using selector: ${selector}`);
+                            console.log('First 3 ingredients:', ingredients.slice(0, 3).map(i => i.name || i.quantity));
                             break;
                         }
                     }
