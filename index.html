@@ -53,7 +53,7 @@
             height: 200px;
             object-fit: contain;
             filter: drop-shadow(0 8px 16px rgba(0,0,0,0.3));
-            animation: pulse 0.45s ease-in-out;
+            animation: pulse 0.75s ease-in-out;
         }
         
         @keyframes zoomOut {
@@ -670,7 +670,7 @@
         let recipesUnsubscribe = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // Hide splash screen after 0.45 seconds with zoom-out animation
+            // Hide splash screen after 0.75 seconds with zoom-out animation
             setTimeout(() => {
                 const splash = document.getElementById('splash-screen');
                 if (splash) {
@@ -678,7 +678,7 @@
                     // Remove from DOM after animation completes
                     setTimeout(() => splash.remove(), 500);
                 }
-            }, 450);
+            }, 750);
             
             // Initialize Firebase
             await initFirebase();
