@@ -2400,6 +2400,11 @@
             console.log('deletePantryItem called:', id);
             if (confirm('Delete this item?')) {
                 try {
+                    // Check if item is a staple - if so, add to House list
+                    const item = pantryItems.find(i => i.id === id);
+                    if (item && item.isStaple) {
+                        await addStapleToHouseList(item);
+                    }
                     await deletePantryItemFromFirebase(id);
                     // Real-time listener will update UI automatically
                 } catch (error) {
@@ -2614,9 +2619,50 @@
             if (!currentEditItemId) return;
             
             if (confirm('Delete this item from your pantry?')) {
+                // Check if item is a staple - if so, add to House list
+                const item = pantryItems.find(i => i.id === currentEditItemId);
+                if (item && item.isStaple) {
+                    await addStapleToHouseList(item);
+                }
                 await deletePantryItemFromFirebase(currentEditItemId);
                 closeEditPantryModal();
                 // Real-time listener will update UI automatically
+            }
+        }
+
+        async function addStapleToHouseList(item) {
+            // Find or create House shopping list for staple items
+            let houseList = shoppingLists.find(l => l.name === '🏠 House');
+            let houseListId = null;
+            let houseItems = [];
+            
+            if (houseList) {
+                houseListId = houseList.id;
+                houseItems = [...(houseList.items || [])];
+            } else {
+                // Create House list
+                const newList = {
+                    name: '🏠 House',
+                    items: [],
+                    createdAt: new Date().toISOString()
+                };
+                const docRef = await addShoppingListToFirebase(newList);
+                houseListId = docRef.id;
+                houseItems = [];
+            }
+            
+            // Add item to House list if not already there
+            const exists = houseItems.find(hi => hi.name.toLowerCase() === item.name.toLowerCase());
+            if (!exists) {
+                houseItems.push({
+                    id: Date.now(),
+                    name: item.name,
+                    quantity: 1,
+                    unit: item.unit || 'unit',
+                    completed: false
+                });
+                await updateShoppingListInFirebase(houseListId, { items: houseItems });
+                console.log('⭐ Staple item', item.name, 'added to House list');
             }
         }
 
