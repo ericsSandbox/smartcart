@@ -1398,10 +1398,40 @@
                 document.getElementById('emptyShoppingState').style.display = 'none';
                 document.getElementById('shoppingLists').innerHTML = filtered.map(list => `
                     <div style="background: white; border-radius: 10px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                        <div style="font-weight: 600; margin-bottom: 4px;">${list.name}</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <div style="font-weight: 600; flex: 1;">${list.name}</div>
+                            <button onclick="renameShoppingList(${list.id || list.name.replace(/'/g, "\\'")}, '${list.name.replace(/'/g, "\\'")}'); event.stopPropagation();" 
+                                    style="background: #3b82f6; color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; margin-right: 8px;">
+                                ✏️ Rename
+                            </button>
+                            <button onclick="deleteShoppingList(${list.id || list.name.replace(/'/g, "\\'")}, '${list.name.replace(/'/g, "\\'")}'); event.stopPropagation();" 
+                                    style="background: #ef4444; color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer;">
+                                🗑️ Delete
+                            </button>
+                        </div>
                         <div style="font-size: 12px; color: #6b7280;">${(list.items || []).length} items</div>
                     </div>
                 `).join('');
+            }
+        }
+
+        function renameShoppingList(listId, currentName) {
+            const newName = prompt('Enter new name for shopping list:', currentName);
+            if (newName && newName.trim() && newName !== currentName) {
+                const list = shoppingLists.find(l => (l.id === listId) || (l.name === currentName));
+                if (list) {
+                    list.name = newName.trim();
+                    saveData();
+                    renderUI();
+                }
+            }
+        }
+
+        function deleteShoppingList(listId, listName) {
+            if (confirm(`Delete shopping list "${listName}"?`)) {
+                shoppingLists = shoppingLists.filter(l => (l.id !== listId) && (l.name !== listName));
+                saveData();
+                renderUI();
             }
         }
 
