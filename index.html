@@ -482,6 +482,7 @@
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <span id="currentListName" style="font-size: 18px; font-weight: 600;">Shopping List</span>
                 <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-secondary" onclick="renameShoppingList(currentShoppingListId)" style="padding: 6px 12px; font-size: 12px;">✏️ Rename</button>
                     <button class="btn btn-secondary" onclick="deleteShoppingList(currentShoppingListId)" style="padding: 6px 12px; font-size: 12px;">🗑️ Delete</button>
                     <button class="btn btn-secondary" onclick="closeShoppingListModal()" style="padding: 6px 12px; font-size: 12px;">✕ Close</button>
                 </div>
@@ -3642,6 +3643,22 @@
                 await updateShoppingListInFirebase(listId, { items: list.items });
                 renderShoppingListDetails();
             }
+        }
+
+        async function renameShoppingList(listId) {
+            const list = shoppingLists.find(l => l.id === listId);
+            if (!list) return;
+
+            const newName = prompt('Rename shopping list:', list.name);
+            if (!newName) return;
+
+            const trimmed = newName.trim();
+            if (!trimmed || trimmed === list.name) return;
+
+            list.name = trimmed;
+            document.getElementById('currentListName').textContent = trimmed;
+            await updateShoppingListInFirebase(listId, { name: trimmed });
+            renderShopping();
         }
 
         async function deleteShoppingList(listId) {
