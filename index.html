@@ -526,6 +526,27 @@
         </div>
     </div>
 
+    <div class="modal" id="recipeEditModal">
+        <div class="modal-content">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 18px; font-weight: 600;">Edit Recipe</span>
+                <button class="btn btn-secondary" onclick="closeRecipeEditModal()" style="padding: 6px 12px; font-size: 12px;">✕ Close</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <label style="font-size: 12px; color: #6b7280;">Name</label>
+                <input type="text" id="recipeEditName" placeholder="Recipe name" style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                <label style="font-size: 12px; color: #6b7280;">URL (optional)</label>
+                <input type="text" id="recipeEditUrl" placeholder="https://..." style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+                <label style="font-size: 12px; color: #6b7280;">Ingredients (one per line)</label>
+                <textarea id="recipeEditIngredients" rows="8" style="width: 100%; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 14px; font-family: inherit; resize: vertical;"></textarea>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" onclick="closeRecipeEditModal()" style="flex: 1;">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveRecipeEdits()" style="flex: 1;">💾 Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <style>
         @keyframes fadeIn {
             from { opacity: 0; }
@@ -676,6 +697,7 @@
         let members = [];
         let recipes = [];
         let currentRecipeId = null;
+        let currentEditRecipeId = null;
         let scannerActive = false;
         let lastDetectedBarcode = null;
         
@@ -4049,7 +4071,7 @@
                         return `
                         <div class="recipe-card">
                             ${recipe.image ? `
-                                <div style="width: 100%; height: 160px; margin-bottom: 12px; border-radius: 8px; overflow: hidden;">
+                                <div style="width: 100%; height: 120px; margin-bottom: 8px; border-radius: 8px; overflow: hidden;">
                                     <img src="${recipe.image}" 
                                          alt="${recipe.name || 'Recipe'}" 
                                          style="width: 100%; height: 100%; object-fit: cover;"
@@ -4066,6 +4088,7 @@
                             <div class="recipe-card-actions">
                                 <button class="recipe-btn-view" onclick="openRecipeDetails('${recipe.id}')">👀 View</button>
                                 ${recipe.url && hostname !== 'Invalid URL' ? `<button class="recipe-btn-open" onclick="openRecipe('${recipe.id}')">🌐 Open</button>` : ''}
+                                <button class="recipe-btn-edit" onclick="openRecipeEdit('${recipe.id}')">✍️ Edit</button>
                                 <button class="recipe-btn-add" onclick="addRecipeToShoppingList('${recipe.id}')">🛒 Add List</button>
                                 <button class="recipe-btn-rename" onclick="renameRecipe('${recipe.id}')">✏️ Rename</button>
                                 <button class="recipe-btn-delete" onclick="deleteRecipe('${recipe.id}')">🗑️</button>
@@ -4571,6 +4594,76 @@
         function openRecipeFromModal() {
             if (!currentRecipeId) return;
             openRecipe(currentRecipeId);
+        }
+
+        function openRecipeEdit(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+
+            currentEditRecipeId = recipeId;
+            document.getElementById('recipeEditName').value = recipe.name || '';
+            document.getElementById('recipeEditUrl').value = recipe.url || '';
+
+            const ingredientsText = (recipe.ingredients || [])
+                .map(ing => {
+                    const qty = ing.quantity ? `${ing.quantity} ` : '';
+                    return `${qty}${ing.name || ''}`.trim();
+                })
+                .filter(line => line.length > 0)
+                .join('\n');
+            document.getElementById('recipeEditIngredients').value = ingredientsText;
+
+            document.getElementById('recipeEditModal').classList.add('active');
+        }
+
+        function closeRecipeEditModal() {
+            document.getElementById('recipeEditModal').classList.remove('active');
+            currentEditRecipeId = null;
+        }
+
+        function parseRecipeIngredientsText(text) {
+            if (!text) return [];
+            return text
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .map(line => {
+                    const match = line.match(/^([\d./]+\s*(?:cups?|tbsp?|tsp?|oz|lb|g|kg|ml|l)?\s*)(.+)$/i);
+                    if (match) {
+                        return {
+                            quantity: match[1].trim(),
+                            name: match[2].trim()
+                        };
+                    }
+                    return {
+                        quantity: '',
+                        name: line
+                    };
+                });
+        }
+
+        async function saveRecipeEdits() {
+            if (!currentEditRecipeId) return;
+            const recipe = recipes.find(r => r.id === currentEditRecipeId);
+            if (!recipe) return;
+
+            const name = document.getElementById('recipeEditName').value.trim() || 'My Recipe';
+            const url = document.getElementById('recipeEditUrl').value.trim();
+            const ingredientsText = document.getElementById('recipeEditIngredients').value.trim();
+            const ingredients = parseRecipeIngredientsText(ingredientsText);
+
+            recipe.name = name;
+            recipe.url = url || null;
+            recipe.ingredients = ingredients;
+
+            await updateRecipeInFirebase(currentEditRecipeId, {
+                name,
+                url: url || null,
+                ingredients
+            });
+
+            renderRecipes();
+            closeRecipeEditModal();
         }
 
         async function renameRecipe(recipeId) {
