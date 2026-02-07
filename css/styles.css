@@ -694,8 +694,8 @@ select:focus {
 .recipe-card {
     background: white;
     border-radius: 10px;
-    padding: 10px;
-    margin-bottom: 8px;
+    padding: 8px 10px 10px;
+    margin-bottom: 6px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     border-left: 4px solid #fbbf24;
 }
@@ -704,7 +704,7 @@ select:focus {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .recipe-card-title {
@@ -724,17 +724,19 @@ select:focus {
 .recipe-card-actions {
     display: flex;
     gap: 6px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
 }
 
 .recipe-card-actions button {
-    flex: 1 1 30%;
-    padding: 6px 10px;
+    flex: 0 0 auto;
+    padding: 12px 12px;
     border: none;
     border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
+    min-height: 44px;
 }
 
 .recipe-btn-open {
@@ -766,7 +768,7 @@ select:focus {
     background: #ef4444;
     color: white;
     flex: 0;
-    padding: 6px 8px;
+    padding: 12px 12px;
 }
 
 .recipe-btn-open:active {

@@ -4071,7 +4071,7 @@
                         return `
                         <div class="recipe-card">
                             ${recipe.image ? `
-                                <div style="width: 100%; height: 120px; margin-bottom: 8px; border-radius: 8px; overflow: hidden;">
+                                <div style="width: 100%; height: 80px; margin-bottom: 6px; border-radius: 8px; overflow: hidden;">
                                     <img src="${recipe.image}" 
                                          alt="${recipe.name || 'Recipe'}" 
                                          style="width: 100%; height: 100%; object-fit: cover;"
@@ -4081,15 +4081,10 @@
                             <div class="recipe-card-header">
                                 <div class="recipe-card-title">${recipe.name || 'Untitled Recipe'}</div>
                             </div>
-                            ${hostname ? `<div class="recipe-card-meta">🔗 ${hostname}</div>` : ''}
-                            ${recipe.ingredients && recipe.ingredients.length > 0 ? 
-                                `<div class="recipe-card-meta">📝 ${recipe.ingredients.length} ingredients</div>` : 
-                                '<div class="recipe-card-meta" style="color: #ef4444;">⚠️ No ingredients saved</div>'}
                             <div class="recipe-card-actions">
-                                <button class="recipe-btn-view" onclick="openRecipeDetails('${recipe.id}')">👀 View</button>
+                                <button class="recipe-btn-view" onclick="openRecipeEdit('${recipe.id}')">👀 View/Edit</button>
                                 ${recipe.url && hostname !== 'Invalid URL' ? `<button class="recipe-btn-open" onclick="openRecipe('${recipe.id}')">🌐 Open</button>` : ''}
-                                <button class="recipe-btn-edit" onclick="openRecipeEdit('${recipe.id}')">✍️ Edit</button>
-                                <button class="recipe-btn-add" onclick="addRecipeToShoppingList('${recipe.id}')">🛒 Add List</button>
+                                <button class="recipe-btn-add" onclick="addRecipeToShoppingList('${recipe.id}')">🛒 Add</button>
                                 <button class="recipe-btn-rename" onclick="renameRecipe('${recipe.id}')">✏️ Rename</button>
                                 <button class="recipe-btn-delete" onclick="deleteRecipe('${recipe.id}')">🗑️</button>
                             </div>
