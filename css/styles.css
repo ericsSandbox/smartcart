@@ -724,10 +724,11 @@ select:focus {
 .recipe-card-actions {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .recipe-card-actions button {
-    flex: 1;
+    flex: 1 1 45%;
     padding: 8px 12px;
     border: none;
     border-radius: 6px;
@@ -741,8 +742,18 @@ select:focus {
     color: white;
 }
 
+.recipe-btn-view {
+    background: #6366f1;
+    color: white;
+}
+
 .recipe-btn-add {
     background: #10b981;
+    color: white;
+}
+
+.recipe-btn-rename {
+    background: #f59e0b;
     color: white;
 }
 
@@ -757,8 +768,16 @@ select:focus {
     background: #2563eb;
 }
 
+.recipe-btn-view:active {
+    background: #4f46e5;
+}
+
 .recipe-btn-add:active {
     background: #059669;
+}
+
+.recipe-btn-rename:active {
+    background: #d97706;
 }
 
 .recipe-btn-delete:active {

@@ -512,6 +512,20 @@
         </div>
     </div>
 
+    <div class="modal" id="recipeViewModal">
+        <div class="modal-content">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span id="recipeViewTitle" style="font-size: 18px; font-weight: 600;">Recipe</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-secondary" id="recipeViewOpenBtn" onclick="openRecipeFromModal()" style="padding: 6px 12px; font-size: 12px;">🌐 Open</button>
+                    <button class="btn btn-secondary" onclick="closeRecipeViewModal()" style="padding: 6px 12px; font-size: 12px;">✕ Close</button>
+                </div>
+            </div>
+            <div id="recipeViewMeta" style="font-size: 12px; color: #6b7280; margin-bottom: 12px;"></div>
+            <div id="recipeViewIngredients" style="max-height: 500px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
     <style>
         @keyframes fadeIn {
             from { opacity: 0; }
@@ -661,6 +675,7 @@
         let shoppingLists = [];
         let members = [];
         let recipes = [];
+        let currentRecipeId = null;
         let scannerActive = false;
         let lastDetectedBarcode = null;
         
@@ -946,6 +961,19 @@
             } catch (error) {
                 console.error('Error adding recipe:', error);
                 return null;
+            }
+        }
+
+        async function updateRecipeInFirebase(recipeId, updates) {
+            if (!db || !householdId) return false;
+            try {
+                await db.collection('households').doc(householdId)
+                    .collection('recipes').doc(recipeId).update(updates);
+                console.log('✅ Recipe updated:', recipeId);
+                return true;
+            } catch (error) {
+                console.error('Error updating recipe:', error);
+                return false;
             }
         }
 
@@ -4036,8 +4064,10 @@
                                 `<div class="recipe-card-meta">📝 ${recipe.ingredients.length} ingredients</div>` : 
                                 '<div class="recipe-card-meta" style="color: #ef4444;">⚠️ No ingredients saved</div>'}
                             <div class="recipe-card-actions">
+                                <button class="recipe-btn-view" onclick="openRecipeDetails('${recipe.id}')">👀 View</button>
                                 ${recipe.url && hostname !== 'Invalid URL' ? `<button class="recipe-btn-open" onclick="openRecipe('${recipe.id}')">🌐 Open</button>` : ''}
                                 <button class="recipe-btn-add" onclick="addRecipeToShoppingList('${recipe.id}')">🛒 Add List</button>
+                                <button class="recipe-btn-rename" onclick="renameRecipe('${recipe.id}')">✏️ Rename</button>
                                 <button class="recipe-btn-delete" onclick="deleteRecipe('${recipe.id}')">🗑️</button>
                             </div>
                         </div>
@@ -4488,6 +4518,77 @@
             if (!recipe || !recipe.url) return;
             
             window.open(recipe.url, '_blank');
+        }
+
+        function openRecipeDetails(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+
+            currentRecipeId = recipeId;
+            document.getElementById('recipeViewTitle').textContent = recipe.name || 'Recipe';
+
+            let metaText = '';
+            if (recipe.url) {
+                try {
+                    const hostname = new URL(recipe.url).hostname.replace('www.', '');
+                    metaText = `🔗 ${hostname}`;
+                } catch (e) {
+                    metaText = '🔗 Invalid URL';
+                }
+            }
+            document.getElementById('recipeViewMeta').textContent = metaText;
+
+            const ingredientsContainer = document.getElementById('recipeViewIngredients');
+            const ingredients = recipe.ingredients || [];
+            if (ingredients.length === 0) {
+                ingredientsContainer.innerHTML = '<div style="color: #ef4444; font-size: 14px;">⚠️ No ingredients saved for this recipe.</div>';
+            } else {
+                ingredientsContainer.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        ${ingredients.map(ing => {
+                            const qty = ing.quantity ? `${ing.quantity} ` : '';
+                            return `<div style="padding: 8px 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;">${qty}${ing.name}</div>`;
+                        }).join('')}
+                    </div>
+                `;
+            }
+
+            const openBtn = document.getElementById('recipeViewOpenBtn');
+            if (recipe.url) {
+                openBtn.style.display = 'inline-flex';
+            } else {
+                openBtn.style.display = 'none';
+            }
+
+            document.getElementById('recipeViewModal').classList.add('active');
+        }
+
+        function closeRecipeViewModal() {
+            document.getElementById('recipeViewModal').classList.remove('active');
+            currentRecipeId = null;
+        }
+
+        function openRecipeFromModal() {
+            if (!currentRecipeId) return;
+            openRecipe(currentRecipeId);
+        }
+
+        async function renameRecipe(recipeId) {
+            const recipe = recipes.find(r => r.id === recipeId);
+            if (!recipe) return;
+
+            const newName = prompt('Rename recipe:', recipe.name || 'My Recipe');
+            if (!newName) return;
+            const trimmed = newName.trim();
+            if (!trimmed || trimmed === recipe.name) return;
+
+            recipe.name = trimmed;
+            await updateRecipeInFirebase(recipeId, { name: trimmed });
+            renderRecipes();
+
+            if (currentRecipeId === recipeId) {
+                document.getElementById('recipeViewTitle').textContent = trimmed;
+            }
         }
 
         async function addRecipeToShoppingList(recipeId) {
