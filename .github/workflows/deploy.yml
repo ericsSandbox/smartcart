@@ -33,6 +33,9 @@ jobs:
           echo "📋 Copying files to _site..."
           cp index.html _site/
           cp .nojekyll _site/ || true
+          cp -r css _site/ 2>/dev/null || true
+          cp -r js _site/ 2>/dev/null || true
+          cp -r images _site/ 2>/dev/null || true
           cp -r public/* _site/ 2>/dev/null || true
           cp -r data _site/ 2>/dev/null || true
           cp -r docs/* _site/ 2>/dev/null || true
@@ -53,7 +56,6 @@ jobs:
         with:
           path: '_site'
           retention-days: 5
-          if-no-files-found: error
 
       - name: Wait for artifact processing
         run: |
