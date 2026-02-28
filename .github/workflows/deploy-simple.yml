@@ -1,11 +1,14 @@
 name: Deploy to GitHub Pages (Simple - DISABLED)
 
+# GitHub Pages is configured to deploy directly from the main branch root.
+# No workflow needed - just push to main and the site updates automatically.
 on:
   workflow_dispatch:
     inputs:
       disabled:
-        description: 'This workflow is disabled. Use deploy.yml instead.'
+        description: 'Disabled - site auto-deploys from main branch'
         required: false
+
 
 jobs:
   deploy:

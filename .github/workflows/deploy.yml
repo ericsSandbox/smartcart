@@ -1,39 +1,14 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages (DISABLED)
 
+# GitHub Pages is configured to deploy directly from the main branch root.
+# No workflow needed - just push to main and the site updates automatically.
+# This workflow is disabled to prevent conflicts.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      disabled:
+        description: 'Disabled - site auto-deploys from main branch'
+        required: false
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build deployment directory
-        run: |
-          mkdir -p dist
-          cp index.html dist/
-          cp manifest.json dist/ 2>/dev/null || true
-          cp sw.js dist/ 2>/dev/null || true
-          cp -r css dist/ 2>/dev/null || true
-          cp -r js dist/ 2>/dev/null || true
-          cp -r images dist/ 2>/dev/null || true
-          touch dist/.nojekyll
-          echo "✅ Build complete"
-          echo "📁 dist contents:"
-          find dist -type f | sort
-
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          force_orphan: true
 
 
