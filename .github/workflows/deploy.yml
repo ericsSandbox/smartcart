@@ -6,66 +6,34 @@ on:
       - main
   workflow_dispatch:
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Create deployment directory
+      - name: Build deployment directory
         run: |
-          mkdir -p _site
-          echo "📋 Copying files to _site..."
-          cp index.html _site/
-          cp .nojekyll _site/ || true
-          cp -r css _site/ 2>/dev/null || true
-          cp -r js _site/ 2>/dev/null || true
-          cp -r images _site/ 2>/dev/null || true
-          cp -r public/* _site/ 2>/dev/null || true
-          cp -r data _site/ 2>/dev/null || true
-          cp -r docs/* _site/ 2>/dev/null || true
-          cp *.md _site/ 2>/dev/null || true
-          echo "✅ Setup complete"
-          echo "📁 Contents of _site:"
-          ls -lah _site/ | head -20
+          mkdir -p dist
+          cp index.html dist/
+          cp manifest.json dist/ 2>/dev/null || true
+          cp sw.js dist/ 2>/dev/null || true
+          cp -r css dist/ 2>/dev/null || true
+          cp -r js dist/ 2>/dev/null || true
+          cp -r images dist/ 2>/dev/null || true
+          touch dist/.nojekyll
+          echo "✅ Build complete"
+          echo "📁 dist contents:"
+          find dist -type f | sort
 
-      - name: Verify artifact contents
-        run: |
-          echo "Checking critical files..."
-          [ -f _site/index.html ] && echo "✅ index.html found" || echo "❌ index.html missing"
-          [ -f _site/.nojekyll ] && echo "✅ .nojekyll found" || echo "❌ .nojekyll missing"
-          echo "Total files in _site: $(find _site -type f | wc -l)"
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: '_site'
-          retention-days: 5
-
-      - name: Wait for artifact processing
-        run: |
-          echo "⏳ Waiting for artifact to be processed..."
-          sleep 10
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          force_orphan: true
 
 
