@@ -2978,12 +2978,15 @@
 
             const removeIds = [];
             const updates = [];
+            let keptCount = 0;
 
             for (const draftItem of pantryReviewDraft) {
                 if (!draftItem.keep) {
                     removeIds.push(draftItem.id);
                     continue;
                 }
+
+                keptCount += 1;
 
                 if (!Number.isFinite(draftItem.quantity) || draftItem.quantity <= 0) {
                     alert(`Quantity for "${draftItem.name}" must be greater than 0, or uncheck it to remove.`);
@@ -2998,13 +3001,13 @@
                 const quantityChanged = Math.abs(currentQuantity - draftItem.quantity) > 0.0001;
                 const unitChanged = currentUnit !== draftItem.unit;
 
-                if (quantityChanged || unitChanged) {
-                    updates.push({
-                        id: draftItem.id,
-                        quantity: draftItem.quantity,
-                        unit: draftItem.unit
-                    });
-                }
+                updates.push({
+                    id: draftItem.id,
+                    quantity: draftItem.quantity,
+                    unit: draftItem.unit,
+                    quantityChanged,
+                    unitChanged
+                });
             }
 
             for (const id of removeIds) {
@@ -3014,16 +3017,19 @@
             for (const update of updates) {
                 await updatePantryItemInFirebase(update.id, {
                     quantity: update.quantity,
-                    unit: update.unit
+                    unit: update.unit,
+                    // Keeping an item in review restarts its pantry age window.
+                    created_at: firebase.firestore.FieldValue.serverTimestamp()
                 });
             }
 
             const removedCount = removeIds.length;
-            const updatedCount = updates.length;
+            const updatedCount = updates.filter(update => update.quantityChanged || update.unitChanged).length;
+            const resetCount = keptCount;
 
             closePantryReviewModal();
-            if (removedCount > 0 || updatedCount > 0) {
-                alert(`✅ Pantry review complete\n\nRemoved: ${removedCount} item(s)\nUpdated: ${updatedCount} item(s)`);
+            if (removedCount > 0 || updatedCount > 0 || resetCount > 0) {
+                alert(`✅ Pantry review complete\n\nRemoved: ${removedCount} item(s)\nUpdated: ${updatedCount} item(s)\n30-day clock reset: ${resetCount} item(s)`);
             }
         }
 
