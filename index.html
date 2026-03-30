@@ -437,6 +437,26 @@
         </div>
     </div>
 
+    <div class="modal" id="pantryReviewModal">
+        <div class="modal-content" style="max-width: 760px; width: min(96vw, 760px); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 18px; font-weight: 700;">⏰ Pantry Review (30+ Days)</span>
+                <button class="btn btn-secondary" onclick="closePantryReviewModal()" style="padding: 6px 12px; font-size: 12px;">✕ Close</button>
+            </div>
+
+            <div style="font-size: 13px; color: #4b5563; margin-bottom: 12px;">
+                Items below have been in your pantry for over 30 days. Keep items by leaving them checked, or uncheck to remove them.
+            </div>
+
+            <div id="pantryReviewList" style="overflow-y: auto; flex: 1; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #f9fafb;"></div>
+
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button class="btn btn-secondary" onclick="closePantryReviewModal()" style="flex: 1;">Cancel</button>
+                <button class="btn btn-primary" onclick="savePantryReviewChanges()" style="flex: 2;">✅ Apply Changes</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="addMemberModal">
         <div class="modal-content">
             <div class="modal-header">Add Member</div>
@@ -700,6 +720,9 @@
         let currentEditRecipeId = null;
         let scannerActive = false;
         let lastDetectedBarcode = null;
+
+        const PANTRY_REVIEW_DAYS = 30;
+        let pantryReviewDraft = [];
         
         // Firestore listeners (for cleanup)
         let pantryUnsubscribe = null;
@@ -736,6 +759,7 @@
             }
             
             renderUI();
+            maybeShowPantryAgedItemsPopup();
             initScanner(); // Initialize barcode scanner
         });
 
@@ -1383,6 +1407,10 @@
             
             document.getElementById(tab).classList.add('active');
             event.target.classList.add('active');
+
+            if (tab === 'pantry') {
+                maybeShowPantryAgedItemsPopup();
+            }
         }
 
         function switchFormTab(form) {
@@ -2750,6 +2778,190 @@
         function isExpired(expiryDate) {
             if (!expiryDate) return false;
             return new Date(expiryDate) < new Date();
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeDate(value) {
+            if (!value) return null;
+
+            if (typeof value.toDate === 'function') {
+                const converted = value.toDate();
+                return Number.isNaN(converted.getTime()) ? null : converted;
+            }
+
+            if (typeof value === 'object' && typeof value.seconds === 'number') {
+                const converted = new Date(value.seconds * 1000);
+                return Number.isNaN(converted.getTime()) ? null : converted;
+            }
+
+            const converted = new Date(value);
+            return Number.isNaN(converted.getTime()) ? null : converted;
+        }
+
+        function getPantryItemCreatedDate(item) {
+            return normalizeDate(item.created_at || item.createdAt || item.added_at || item.addedAt);
+        }
+
+        function getPantryItemAgeDays(item) {
+            const createdDate = getPantryItemCreatedDate(item);
+            if (!createdDate) return null;
+
+            const msPerDay = 1000 * 60 * 60 * 24;
+            return Math.floor((Date.now() - createdDate.getTime()) / msPerDay);
+        }
+
+        function getPantryItemsOlderThan(days) {
+            return pantryItems
+                .map(item => ({ item, ageDays: getPantryItemAgeDays(item) }))
+                .filter(entry => entry.ageDays !== null && entry.ageDays > days)
+                .sort((a, b) => b.ageDays - a.ageDays);
+        }
+
+        function maybeShowPantryAgedItemsPopup() {
+            const modal = document.getElementById('pantryReviewModal');
+            if (!modal || modal.classList.contains('active')) return;
+
+            const staleItems = getPantryItemsOlderThan(PANTRY_REVIEW_DAYS);
+            if (staleItems.length === 0) return;
+
+            pantryReviewDraft = staleItems.map(entry => ({
+                id: entry.item.id,
+                name: entry.item.name,
+                quantity: Number(entry.item.quantity || 0),
+                unit: entry.item.unit || 'unit',
+                ageDays: entry.ageDays,
+                keep: true
+            }));
+
+            renderPantryReviewList();
+            modal.classList.add('active');
+        }
+
+        function renderPantryReviewList() {
+            const container = document.getElementById('pantryReviewList');
+            if (!container) return;
+
+            if (pantryReviewDraft.length === 0) {
+                container.innerHTML = '<div style="padding: 14px; text-align: center; color: #6b7280;">No items need review.</div>';
+                return;
+            }
+
+            const unitOptions = ['unit', 'lb', 'oz', 'cup', 'ml', 'piece'];
+
+            container.innerHTML = pantryReviewDraft.map((entry, index) => {
+                const quantityStep = (entry.unit === 'unit' || entry.unit === 'piece') ? '1' : '0.1';
+                const allOptions = unitOptions.includes(entry.unit) ? unitOptions : [...unitOptions, entry.unit];
+
+                return `
+                    <div style="padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; background: ${entry.keep ? '#ffffff' : '#f3f4f6'}; opacity: ${entry.keep ? '1' : '0.75'};">
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                            <input type="checkbox" ${entry.keep ? 'checked' : ''} onchange="togglePantryReviewKeep(${index}, this.checked)" style="margin-top: 2px; width: 18px; height: 18px; cursor: pointer;" />
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: #111827;">${escapeHtml(entry.name)}</div>
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${entry.ageDays} days in pantry</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-left: 28px;">
+                            <input type="number" min="0" step="${quantityStep}" value="${entry.quantity}" ${entry.keep ? '' : 'disabled'} onchange="setPantryReviewQuantity(${index}, this.value)" style="flex: 0 0 110px;" />
+                            <select ${entry.keep ? '' : 'disabled'} onchange="setPantryReviewUnit(${index}, this.value)" style="flex: 0 0 120px;">
+                                ${allOptions.map(option => `<option value="${escapeHtml(option)}" ${entry.unit === option ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+                            </select>
+                            <span style="font-size: 12px; color: #6b7280;">${entry.keep ? 'Still in pantry' : 'Will be removed'}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function togglePantryReviewKeep(index, keep) {
+            if (typeof pantryReviewDraft[index] === 'undefined') return;
+            pantryReviewDraft[index].keep = keep;
+            renderPantryReviewList();
+        }
+
+        function setPantryReviewQuantity(index, value) {
+            if (typeof pantryReviewDraft[index] === 'undefined') return;
+            const parsed = parseFloat(value);
+            pantryReviewDraft[index].quantity = Number.isNaN(parsed) ? 0 : parsed;
+        }
+
+        function setPantryReviewUnit(index, unit) {
+            if (typeof pantryReviewDraft[index] === 'undefined') return;
+            pantryReviewDraft[index].unit = unit || 'unit';
+            renderPantryReviewList();
+        }
+
+        function closePantryReviewModal() {
+            const modal = document.getElementById('pantryReviewModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+            pantryReviewDraft = [];
+        }
+
+        async function savePantryReviewChanges() {
+            if (!pantryReviewDraft.length) {
+                closePantryReviewModal();
+                return;
+            }
+
+            const removeIds = [];
+            const updates = [];
+
+            for (const draftItem of pantryReviewDraft) {
+                if (!draftItem.keep) {
+                    removeIds.push(draftItem.id);
+                    continue;
+                }
+
+                if (!Number.isFinite(draftItem.quantity) || draftItem.quantity <= 0) {
+                    alert(`Quantity for "${draftItem.name}" must be greater than 0, or uncheck it to remove.`);
+                    return;
+                }
+
+                const current = pantryItems.find(i => i.id === draftItem.id);
+                if (!current) continue;
+
+                const currentQuantity = Number(current.quantity || 0);
+                const currentUnit = current.unit || 'unit';
+                const quantityChanged = Math.abs(currentQuantity - draftItem.quantity) > 0.0001;
+                const unitChanged = currentUnit !== draftItem.unit;
+
+                if (quantityChanged || unitChanged) {
+                    updates.push({
+                        id: draftItem.id,
+                        quantity: draftItem.quantity,
+                        unit: draftItem.unit
+                    });
+                }
+            }
+
+            for (const id of removeIds) {
+                await deletePantryItemFromFirebase(id);
+            }
+
+            for (const update of updates) {
+                await updatePantryItemInFirebase(update.id, {
+                    quantity: update.quantity,
+                    unit: update.unit
+                });
+            }
+
+            const removedCount = removeIds.length;
+            const updatedCount = updates.length;
+
+            closePantryReviewModal();
+            if (removedCount > 0 || updatedCount > 0) {
+                alert(`✅ Pantry review complete\n\nRemoved: ${removedCount} item(s)\nUpdated: ${updatedCount} item(s)`);
+            }
         }
 
         function getExpiresIn(expiryDate) {
