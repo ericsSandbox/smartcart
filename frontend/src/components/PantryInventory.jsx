@@ -7,6 +7,8 @@ export function PantryInventory({ householdId, onNavigateToMember }) {
   const [members, setMembers] = useState([]);
   const [zeroItemModal, setZeroItemModal] = useState(null); // { item, prevQuantity }
   const [selectedListId, setSelectedListId] = useState(null);
+  const [cleanoutMode, setCleanoutMode] = useState(false);
+  const [selectedForRemoval, setSelectedForRemoval] = useState(new Set());
   const [newItem, setNewItem] = useState({
     name: '',
     quantity: 1,
@@ -89,6 +91,42 @@ export function PantryInventory({ householdId, onNavigateToMember }) {
     return conflicts;
   };
 
+  const toggleCleanoutMode = () => {
+    setCleanoutMode(prev => !prev);
+    setSelectedForRemoval(new Set());
+  };
+
+  const toggleItemSelection = (itemId) => {
+    setSelectedForRemoval(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedForRemoval.size === items.length) {
+      setSelectedForRemoval(new Set());
+    } else {
+      setSelectedForRemoval(new Set(items.map(i => i.id)));
+    }
+  };
+
+  const removeSelected = async () => {
+    if (selectedForRemoval.size === 0) return;
+    try {
+      await Promise.all(
+        [...selectedForRemoval].map(id => apiService.deletePantryItem(householdId, id))
+      );
+      setSelectedForRemoval(new Set());
+      setCleanoutMode(false);
+      loadPantryItems();
+    } catch (err) {
+      console.error('Failed to remove items', err);
+    }
+  };
+
   const addItem = async (e) => {
     e.preventDefault();
     try {
@@ -116,8 +154,44 @@ export function PantryInventory({ householdId, onNavigateToMember }) {
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-4">Pantry Inventory</h2>
-      
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">Pantry Inventory</h2>
+        <button
+          onClick={toggleCleanoutMode}
+          className={`px-4 py-2 rounded font-semibold ${
+            cleanoutMode
+              ? 'bg-gray-400 text-white hover:bg-gray-500'
+              : 'bg-orange-500 text-white hover:bg-orange-600'
+          }`}
+        >
+          {cleanoutMode ? 'Cancel Cleanout' : 'Cleanout Pantry'}
+        </button>
+      </div>
+
+      {/* Cleanout Mode Bar */}
+      {cleanoutMode && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleSelectAll}
+              className="text-sm text-orange-700 underline hover:no-underline"
+            >
+              {selectedForRemoval.size === items.length ? 'Deselect All' : 'Select All'}
+            </button>
+            <span className="text-sm text-gray-600">
+              {selectedForRemoval.size} of {items.length} selected
+            </span>
+          </div>
+          <button
+            onClick={removeSelected}
+            disabled={selectedForRemoval.size === 0}
+            className="px-4 py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Remove {selectedForRemoval.size > 0 ? `${selectedForRemoval.size} Item${selectedForRemoval.size > 1 ? 's' : ''}` : 'Selected'}
+          </button>
+        </div>
+      )}
+
       <form onSubmit={addItem} className="mb-6">
         <div className="flex gap-2 mb-4 items-center">
           <input
@@ -186,13 +260,27 @@ export function PantryInventory({ householdId, onNavigateToMember }) {
           return (
             <div
               key={item.id}
-              className={`p-4 rounded-lg border ${
-                expiryStatus === 'expired' ? 'bg-red-50 border-red-200' :
-                expiryStatus === 'soon' ? 'bg-yellow-50 border-yellow-200' :
-                'bg-gray-50 border-gray-200'
+              onClick={cleanoutMode ? () => toggleItemSelection(item.id) : undefined}
+              className={`p-4 rounded-lg border transition-colors ${
+                cleanoutMode ? 'cursor-pointer' : ''
+              } ${
+                cleanoutMode && selectedForRemoval.has(item.id)
+                  ? 'bg-red-100 border-red-400'
+                  : expiryStatus === 'expired' ? 'bg-red-50 border-red-200' :
+                    expiryStatus === 'soon' ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-gray-50 border-gray-200'
               }`}
             >
               <div className="flex justify-between items-start">
+                {cleanoutMode && (
+                  <input
+                    type="checkbox"
+                    checked={selectedForRemoval.has(item.id)}
+                    onChange={() => toggleItemSelection(item.id)}
+                    onClick={e => e.stopPropagation()}
+                    className="mt-1 mr-3 w-4 h-4 accent-red-600 flex-shrink-0"
+                  />
+                )}
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold">{item.name}</h3>
