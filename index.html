@@ -848,7 +848,7 @@
         let recipesUnsubscribe = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // Hide splash screen after 2 seconds with zoom-out animation
+            // Hide splash screen after 3 seconds with zoom-out animation
             setTimeout(() => {
                 const splash = document.getElementById('splash-screen');
                 if (splash) {
@@ -856,7 +856,7 @@
                     // Remove from DOM after animation completes
                     setTimeout(() => splash.remove(), 500);
                 }
-            }, 2000);
+            }, 3000);
             
             // Initialize Firebase
             await initFirebase();
