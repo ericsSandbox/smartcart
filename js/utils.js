@@ -36,36 +36,70 @@ export function levenshteinDistance(str1, str2) {
 // Find similar item names (returns null if exact match or no close match)
 export function findSimilarItem(inputName, existingItems) {
     const input = inputName.toLowerCase().trim();
-    
-    // Check for exact match first
-    const exactMatch = existingItems.find(item => 
-        item.name.toLowerCase() === input
-    );
-    if (exactMatch) {
-        return { type: 'exact', item: exactMatch };
+
+    // Exact match first
+    const exactMatch = existingItems.find(item => item.name.toLowerCase() === input);
+    if (exactMatch) return { type: 'exact', item: exactMatch };
+
+    // Descriptors that modify an ingredient but don't define its core identity
+    const descriptors = new Set([
+        'thin', 'thick', 'sliced', 'diced', 'chopped', 'minced', 'shredded', 'grated',
+        'fresh', 'frozen', 'dried', 'raw', 'cooked', 'smoked', 'grilled', 'baked',
+        'fried', 'roasted', 'whole', 'half', 'mini', 'large', 'small', 'medium', 'big',
+        'extra', 'lean', 'fat', 'free', 'low', 'reduced', 'light', 'dark', 'boneless',
+        'skinless', 'strips', 'pieces', 'chunks', 'fillet', 'fillets', 'breast', 'thigh',
+        'wing', 'legs', 'natural', 'organic', 'premium', 'original', 'classic',
+        'the', 'and', 'with', 'style', 'flavored', 'seasoned', 'cured'
+    ]);
+
+    // Extract meaningful food words, stripping out descriptors and numbers
+    function getCoreWords(str) {
+        return str.toLowerCase()
+            .split(/[\s,\-]+/)
+            .filter(w => w.length > 2 && !descriptors.has(w) && !/^\d/.test(w));
     }
 
-    // Find close matches (within 2 character edits)
+    const inputWords = getCoreWords(input);
     let bestMatch = null;
-    let bestDistance = Infinity;
+    let bestScore = 0;
 
     existingItems.forEach(item => {
         const itemName = item.name.toLowerCase();
-        const distance = levenshteinDistance(input, itemName);
-        
-        // Consider it a potential typo if:
-        // 1. Distance is 1-2 characters for short words (<=8 chars)
-        // 2. Distance is 1-3 characters for longer words
+        let score = 0;
+
+        // 1. Levenshtein typo check — catches spelling mistakes like "baon" → "bacon"
+        const dist = levenshteinDistance(input, itemName);
         const threshold = input.length <= 8 ? 2 : 3;
-        
-        if (distance > 0 && distance <= threshold && distance < bestDistance) {
-            bestDistance = distance;
+        if (dist > 0 && dist <= threshold) {
+            score = Math.max(score, 0.6);
+        }
+
+        // 2. Keyword subset match — catches "hickory applewood smoked bacon" → "bacon"
+        //    and "thin bacon strips" → "bacon" by checking if the existing item's core
+        //    words are a subset of the input's core words (or vice versa)
+        if (inputWords.length > 0) {
+            const itemWords = getCoreWords(itemName);
+            if (itemWords.length > 0) {
+                const shorter = itemWords.length <= inputWords.length ? itemWords : inputWords;
+                const longer  = itemWords.length <= inputWords.length ? inputWords : itemWords;
+                const matches = shorter.filter(w =>
+                    longer.some(lw => lw === w || lw.startsWith(w) || w.startsWith(lw))
+                );
+                const coverage = matches.length / shorter.length;
+                if (coverage >= 0.7 && matches.length >= 1) {
+                    score = Math.max(score, 0.5 + coverage * 0.4);
+                }
+            }
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
             bestMatch = item;
         }
     });
 
     if (bestMatch) {
-        return { type: 'similar', item: bestMatch, distance: bestDistance };
+        return { type: 'similar', item: bestMatch };
     }
 
     return null;
