@@ -159,10 +159,15 @@
                 </div>
             </div>
 
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px;">
-                <button id="cleanoutToggleBtn" onclick="toggleCleanoutMode()" class="btn btn-secondary" style="padding: 8px 12px; font-size: 13px;">
-                    🧹 Cleanout Pantry
-                </button>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button id="viewToggleBtn" onclick="togglePantryView()" class="btn btn-secondary" style="padding: 8px 12px; font-size: 13px;">
+                        📂 View: Categories
+                    </button>
+                    <button id="cleanoutToggleBtn" onclick="toggleCleanoutMode()" class="btn btn-secondary" style="padding: 8px 12px; font-size: 13px;">
+                        🧹 Cleanout Pantry
+                    </button>
+                </div>
                 <div id="cleanoutControls" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                     <button id="selectAllCleanoutBtn" onclick="toggleSelectAllForCleanout()" class="btn btn-secondary" style="padding: 8px 12px; font-size: 12px;">Select All</button>
                     <span id="cleanoutSelectionCount" style="font-size: 12px; color: #6b7280;">0 selected</span>
@@ -2791,10 +2796,10 @@
                             if (!existsInHouse) {
                                 // Create a copy of the item with a new ID
                                 houseItems.push({
-                                    id: Date.now() + Math.random(), // Ensure unique ID
+                                    id: newShoppingItemId(),
                                     name: stapleItem.name,
-                                    quantity: stapleItem.quantity,
-                                    unit: stapleItem.unit,
+                                    quantity: parseFloat(stapleItem.quantity) || 1,
+                                    unit: stapleItem.unit || 'unit',
                                     completed: stapleItem.completed || false
                                 });
                             }
@@ -2808,10 +2813,10 @@
                     const existsInHouse = houseItems.find(hi => hi.name.toLowerCase() === item.name.toLowerCase());
                     if (!existsInHouse) {
                         houseItems.push({
-                            id: Date.now(),
+                            id: newShoppingItemId(),
                             name: item.name,
                             quantity: 1,
-                            unit: unit,
+                            unit: unit || 'unit',
                             completed: false
                         });
                         console.log('➕ Added', item.name, 'to House list');
@@ -2880,7 +2885,7 @@
             const exists = houseItems.find(hi => hi.name.toLowerCase() === item.name.toLowerCase());
             if (!exists) {
                 houseItems.push({
-                    id: Date.now(),
+                    id: newShoppingItemId(),
                     name: item.name,
                     quantity: 1,
                     unit: item.unit || 'unit',
@@ -2909,7 +2914,7 @@
             const exists = staplesList.items.find(si => si.name.toLowerCase() === item.name.toLowerCase());
             if (!exists) {
                 const newItem = {
-                    id: Date.now(),
+                    id: newShoppingItemId(),
                     name: item.name,
                     quantity: 1,
                     unit: item.unit || 'unit',
@@ -2924,6 +2929,18 @@
         function isExpired(expiryDate) {
             if (!expiryDate) return false;
             return new Date(expiryDate) < new Date();
+        }
+
+        // Set textContent on an element only if it exists (missing DOM nodes must not throw)
+        function setTextIfPresent(elementId, value) {
+            const el = document.getElementById(elementId);
+            if (el) el.textContent = value;
+        }
+
+        // Collision-safe string ID for shopping list items.
+        // Never use Date.now()+Math.random() floats: parseInt truncation made those items untogglable.
+        function newShoppingItemId() {
+            return 'itm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
         }
 
         function escapeHtml(value) {
@@ -3342,8 +3359,8 @@
             
             const expired = pantryItems.filter(i => isExpired(i.expires_at)).length;
 
-            document.getElementById('totalCount').textContent = pantryItems.length;
-            document.getElementById('expiredCount').textContent = expired;
+            setTextIfPresent('totalCount', pantryItems.length);
+            setTextIfPresent('expiredCount', expired);
 
             if (Object.keys(filteredGrouped).length === 0) {
                 document.getElementById('emptyState').style.display = 'block';
@@ -3490,10 +3507,10 @@
             
             const btn = document.getElementById('viewToggleBtn');
             if (newMode === 'category') {
-                btn.textContent = '📂 View: Categories';
+                if (btn) btn.textContent = '📂 View: Categories';
                 renderPantryByCategory();
             } else {
-                btn.textContent = '📋 View: Items';
+                if (btn) btn.textContent = '📋 View: Items';
                 renderPantry();
             }
         }
@@ -3600,17 +3617,21 @@
             const lowStock = pantryItems.filter(i => i.quantity <= 1).length;
             const expired = pantryItems.filter(i => isExpired(i.expires_at)).length;
 
-            document.getElementById('totalCount').textContent = pantryItems.length;
-            document.getElementById('lowStockCount').textContent = lowStock;
-            document.getElementById('expiredCount').textContent = expired;
+            // Null-guarded: a missing stat element must never kill the render loop
+            setTextIfPresent('totalCount', pantryItems.length);
+            setTextIfPresent('lowStockCount', lowStock);
+            setTextIfPresent('expiredCount', expired);
 
-            if (expired > 0 || lowStock > 0) {
-                document.getElementById('warningBanner').innerHTML = `
-                    ${expired > 0 ? `<div class="warning-banner danger">⚠️ ${expired} expired/expiring</div>` : ''}
-                    ${lowStock > 0 ? `<div class="warning-banner">ℹ️ ${lowStock} low stock</div>` : ''}
-                `;
-            } else {
-                document.getElementById('warningBanner').innerHTML = '';
+            const warningBanner = document.getElementById('warningBanner');
+            if (warningBanner) {
+                if (expired > 0 || lowStock > 0) {
+                    warningBanner.innerHTML = `
+                        ${expired > 0 ? `<div class="warning-banner danger">⚠️ ${expired} expired/expiring</div>` : ''}
+                        ${lowStock > 0 ? `<div class="warning-banner">ℹ️ ${lowStock} low stock</div>` : ''}
+                    `;
+                } else {
+                    warningBanner.innerHTML = '';
+                }
             }
 
             if (filtered.length === 0) {
@@ -3818,13 +3839,13 @@
             });
 
             // Convert to array with "x2", "x3" ONLY if duplicate across selected lists
-            const mergedItemsArray = Object.values(mergedItems).map((item, idx) => {
+            const mergedItemsArray = Object.values(mergedItems).map((item) => {
                 const count = item.fromLists.size;  // How many of the selected lists have this item
                 return {
-                    id: Date.now() + idx + Math.random(),
+                    id: newShoppingItemId(),
                     name: count > 1 ? `${item.name} x${count}` : item.name,
-                    quantity: item.quantity,
-                    unit: item.unit,
+                    quantity: parseFloat(item.quantity) || 1,
+                    unit: item.unit || 'unit',
                     completed: false
                 };
             });
@@ -4036,10 +4057,10 @@
             const list = shoppingLists.find(l => l.id === currentShoppingListId);
             if (list) {
                 const item = {
-                    id: Date.now(),
+                    id: newShoppingItemId(),
                     name: name,
-                    quantity: parseFloat(document.getElementById('shoppingItemQty').value || 1),
-                    unit: document.getElementById('shoppingItemUnit').value,
+                    quantity: parseFloat(document.getElementById('shoppingItemQty').value) || 1,
+                    unit: document.getElementById('shoppingItemUnit').value || 'unit',
                     completed: false
                 };
                 
@@ -4118,10 +4139,10 @@
 
             const finalName = document.getElementById('quickAddItemName').value.trim();
             const item = {
-                id: Date.now(),
+                id: newShoppingItemId(),
                 name: finalName,
-                quantity: parseFloat(document.getElementById('quickAddItemQty').value || 1),
-                unit: document.getElementById('quickAddItemUnit').value,
+                quantity: parseFloat(document.getElementById('quickAddItemQty').value) || 1,
+                unit: document.getElementById('quickAddItemUnit').value || 'unit',
                 completed: false
             };
             
@@ -4154,12 +4175,12 @@
                 return;
             }
             
-            // Convert itemId to number if it's a string
-            const numericItemId = typeof itemId === 'string' ? parseInt(itemId) : itemId;
-            const item = list.items.find(i => i.id == numericItemId); // Use == for loose comparison
-            
+            // Compare as strings: handles new string IDs AND legacy numeric/float IDs
+            // (parseInt truncated float IDs like 1730852301234.123, breaking toggle entirely)
+            const item = list.items.find(i => String(i.id) === String(itemId));
+
             if (!item) {
-                console.error('❌ Item not found:', numericItemId, 'in list items:', list.items.map(i => i.id));
+                console.error('❌ Item not found:', itemId, 'in list items:', list.items.map(i => i.id));
                 return;
             }
             
@@ -4221,9 +4242,8 @@
         async function removeShoppingItem(listId, itemId) {
             const list = shoppingLists.find(l => l.id === listId);
             if (list) {
-                // Convert itemId to number if it's a string (same fix as toggleShoppingItem)
-                const numericItemId = typeof itemId === 'string' ? parseInt(itemId) : itemId;
-                list.items = list.items.filter(i => i.id != numericItemId); // Use loose equality
+                // String comparison: handles new string IDs and legacy numeric/float IDs
+                list.items = list.items.filter(i => String(i.id) !== String(itemId));
                 await updateShoppingListInFirebase(listId, { items: list.items });
                 renderShoppingListDetails();
             }
@@ -4396,11 +4416,13 @@
                         skippedItems.push(`${parsed.name} (pantry has: ${inPantry.quantity} ${inPantry.unit})`);
                     } else {
                         // Item not in pantry, add to shopping list
+                        // parsed.quantity may be a string and parsed.unit may be missing
+                        // (duplicate parseIngredientLine definitions) — coerce to schema
                         const item = {
-                            id: Date.now() + Math.random(),
+                            id: newShoppingItemId(),
                             name: parsed.name,
-                            quantity: parsed.quantity,
-                            unit: parsed.unit,
+                            quantity: parseFloat(parsed.quantity) || 1,
+                            unit: parsed.unit || 'unit',
                             completed: false
                         };
                         list.items.push(item);
@@ -5250,12 +5272,14 @@
             
             // Create shopping list with missing ingredients
             const listName = `🍽️ ${recipe.name}`;
-            const shoppingListItems = missingIngredients.map((ingredient, index) => ({
-                id: Date.now() + index,
+            // Conform to the standard item schema: {id, name, quantity:number, unit, completed}
+            // (was: float id, string quantity, empty unit, and a dead "checked" field)
+            const shoppingListItems = missingIngredients.map(ingredient => ({
+                id: newShoppingItemId(),
                 name: ingredient.name,
-                quantity: ingredient.quantity || '1',
-                unit: '',
-                checked: false
+                quantity: parseFloat(ingredient.quantity) || 1,
+                unit: ingredient.unit || 'unit',
+                completed: false
             }));
             
             const newList = {
